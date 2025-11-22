@@ -1,16 +1,25 @@
+// lib/ui/onboarding/onboarding_flow_screen.dart
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:random_nickname/random_nickname.dart';
 
-import '../../core/match_api.dart';
-import '../../core/models.dart'; // Import models to resolve Gender, etc.
-import '../../core/nickname_service.dart';
+// 여기 두 줄 패키지 경로로 통일
+import 'package:sundate/core/match_api.dart';
+import 'package:sundate/core/models.dart';
+import 'package:sundate/core/nickname_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert'; // jsonDecode, jsonEncode 등 사용
 
 class OnboardingFlowScreen extends StatefulWidget {
+  // MatchApi는 더 이상 여기서 직접 쓰지 않고,
+  // 나중에 다른 기능에서 쓸 수 있도록 남겨두려면 주석 처리 없이 유지만 할 수 있음.
   final MatchApi api;
 
-  const OnboardingFlowScreen({super.key, required this.api});
+  const OnboardingFlowScreen({
+    super.key,
+    required this.api,
+  });
 
   @override
   State<OnboardingFlowScreen> createState() => _OnboardingFlowScreenState();
@@ -20,23 +29,32 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   final _pageController = PageController();
   int _step = 0;
 
-  // Controllers and state variables
+  // 입력 컨트롤러
   final _studentIdCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _passwordConfirmCtrl = TextEditingController();
   final _nicknameCtrl = TextEditingController();
+
   final _nicknameService = NicknameService();
   String? _pickedFileName;
+  String? _authToken; // /api/login 결과로 받은 토큰을 임시 저장
+
   Gender _gender = Gender.female;
+
   final List<String> _mbtiOptions = const [
-    'ISTJ', 'ISFJ', 'INFJ', 'INTJ', 'ISTP', 'ISFP', 'INFP', 'INTP',
-    'ESTP', 'ESFP', 'ENFP', 'ENTP', 'ESTJ', 'ESFJ', 'ENFJ', 'ENTJ',
+    'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
+    'ISTP', 'ISFP', 'INFP', 'INTP',
+    'ESTP', 'ESFP', 'ENFP', 'ENTP',
+    'ESTJ', 'ESFJ', 'ENFJ', 'ENTJ',
   ];
   String _selectedMbti = 'INFP';
+
   String _selectedProvince = '경기도';
   String _selectedCity = '용인시';
+
   bool _saving = false;
 
+  // 지역 정보
   final Map<String, List<String>> _regions = {
     '서울특별시': [
       '강남구', '강동구', '강북구', '강서구',
@@ -175,6 +193,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
       if (result != null && result.files.single.path != null) {
         setState(() {
           _pickedFileName = result.files.single.name;
+          // 실제 파일 전송은 백엔드 API 확정 후 multipart로 추가 가능
         });
       }
     } catch (e) {
@@ -182,12 +201,92 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
     }
   }
 
+  // =========================
+  // 실제 HTTP 요청 부분
+  // =========================
+
+  Future<void> _sendLoginRequest() async {
+    final studentId = _studentIdCtrl.text.trim();
+    final password = _passwordCtrl.text.trim();
+
+    final url = Uri.parse('http://220.149.241.209:8000/api/login/');
+    final resp = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': studentId, // 학번 그대로 사용
+        'password': password,
+      }),
+    );
+
+    if (resp.statusCode != 200 && resp.statusCode != 201) {
+      throw Exception(
+          '로그인 API 실패 (status: ${resp.statusCode}): ${resp.body}');
+    }
+
+    final data = jsonDecode(resp.body);
+    final token = data['token'] as String?;
+    if (token == null || token.isEmpty) {
+      throw Exception('로그인 응답에 token 필드가 없습니다.');
+    }
+    _authToken = token;
+  }
+
+  String _genderToString(Gender g) {
+    switch (g) {
+      case Gender.male:
+        return 'male';
+      case Gender.female:
+        return 'female';
+      default:
+        return 'other';
+    }
+  }
+
+
+  Future<void> _sendProfileUpdateRequest() async {
+    if (_authToken == null) {
+      throw Exception('토큰이 없습니다. 먼저 로그인 요청이 필요합니다.');
+    }
+
+    final url = Uri.parse('http://220.149.241.209:8000/api/user-profile/');
+    final resp = await http.put(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Token $_authToken',
+      },
+      body: jsonEncode({
+        'nickname': _nicknameCtrl.text.trim(),
+        'age': 20, // 실제 나이는 추후 백엔드에서 PDF 기반 추출 후 반영
+        'sex': _genderToString(_gender),
+        'mbti': _selectedMbti,
+        'location': '$_selectedProvince $_selectedCity',
+        // 질문 텍스트는 추후 온보딩에 질문 단계 추가 후 연결 가능
+        'question1': null,
+        'question2': null,
+        'question3': null,
+      }),
+    );
+
+    if (resp.statusCode != 200) {
+      throw Exception(
+          '프로필 업데이트 실패 (status: ${resp.statusCode}): ${resp.body}');
+    }
+  }
+
+  // =========================
+  // 온보딩 단계 제어
+  // =========================
+
   Future<void> _next() async {
+    // 단계별 검증
     switch (_step) {
       case 0:
         final studentId = _studentIdCtrl.text.trim();
         final password = _passwordCtrl.text.trim();
         final passwordConfirm = _passwordConfirmCtrl.text.trim();
+
         if (!RegExp(r'^\d{8}$').hasMatch(studentId)) {
           _showError('형식에 맞지 않습니다. 8자리 학번을 입력하세요.');
           return;
@@ -200,54 +299,96 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
           _showError('비밀번호가 일치하지 않습니다.');
           return;
         }
+        await _submitProfile();
         break;
+
       case 1:
         if (_nicknameCtrl.text.trim().isEmpty) {
           _showError('닉네임을 입력해 주세요.');
           return;
         }
         break;
+
       case 2:
         if (_pickedFileName == null) {
           _showError('재학증명서를 업로드해 주세요.');
           return;
         }
         break;
+
+      default:
+        break;
     }
 
+    // 마지막 단계 아니면 다음 페이지로
     if (_step < 5) {
       setState(() => _step++);
-      _pageController.animateToPage(_step, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
-    } else {
-      await _submitProfile();
+      _pageController.animateToPage(
+        _step,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+      return;
     }
+
   }
 
   void _prev() {
     if (_step == 0) return;
     setState(() => _step--);
-    _pageController.animateToPage(_step, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+    _pageController.animateToPage(
+      _step,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
   }
 
   Future<void> _submitProfile() async {
     setState(() => _saving = true);
+
     try {
-      await widget.api.signUp(
-        studentId: _studentIdCtrl.text.trim(),
-        password: _passwordCtrl.text.trim(),
-        nickname: _nicknameCtrl.text.trim(),
-        age: 20, // Temporary age, to be extracted from PDF by backend
-        gender: _gender,
-        mbti: _selectedMbti,
-        region: '$_selectedProvince $_selectedCity',
-        preferredCategories: const [VolunteerCategory.animal],
-        preferredTimeSlots: const [TimeSlot.afternoon],
-        preferredRegion: _selectedProvince,
+      final signupResp = await http.post(
+        Uri.parse("http://220.149.241.209:8000/api/signup/"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": _studentIdCtrl.text.trim(),  // 이메일 대신 학번 사용
+          "password": _passwordCtrl.text.trim(),
+        }),
       );
-      if (!mounted) return;
+
+      if (signupResp.statusCode != 200 && signupResp.statusCode != 201) {
+        _showError("회원가입 실패: ${signupResp.body}");
+        return;
+      }
+
+      // 응답(JSON) 파싱
+      final data = jsonDecode(signupResp.body);
+      final token = data["token"]; // 백엔드가 토큰 발급하면 저장
+
+      // 저장 후 Profie API 호출
+      final profileResp = await http.put(
+        Uri.parse("http://220.149.241.209:8000/api/user-profile/"),
+        headers: {
+          "Authorization": "Token $token",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "nickname": _nicknameCtrl.text.trim(),
+          "age": 20,
+          "sex": _gender == Gender.male ? "male" : "female",
+          "mbti": _selectedMbti,
+          "location": "$_selectedProvince $_selectedCity",
+        }),
+      );
+
+      if (profileResp.statusCode != 200) {
+        _showError("프로필 저장 실패: ${profileResp.body}");
+        return;
+      }
+
       context.go('/login', extra: {'message': '회원가입이 완료되었습니다. 로그인해주세요.'});
     } catch (e) {
-      _showError('회원가입 실패: $e');
+      _showError('회원가입 중 오류: $e');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -256,10 +397,16 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   @override
   Widget build(BuildContext context) {
     final progress = (_step + 1) / 6;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('회원가입'),
-        leading: _step > 0 ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: _prev) : null,
+        leading: _step > 0
+            ? IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _prev,
+        )
+            : null,
       ),
       body: Column(
         children: [
@@ -290,17 +437,35 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
     );
   }
 
+  // =========================
+  // 각 스텝 UI
+  // =========================
+
   Widget _buildAuthStep() {
     return _StepWrapper(
       title: '로그인 정보를 입력해 주세요.',
       subtitle: '선데이트 활동에 필요한 계정을 만들어요.',
       child: Column(
         children: [
-          TextField(controller: _studentIdCtrl, decoration: const InputDecoration(labelText: '학번 (ID로 사용)'), keyboardType: TextInputType.number),
+          TextField(
+            controller: _studentIdCtrl,
+            decoration: const InputDecoration(
+              labelText: '학번 (ID로 사용)',
+            ),
+            keyboardType: TextInputType.number,
+          ),
           const SizedBox(height: 16),
-          TextField(controller: _passwordCtrl, decoration: const InputDecoration(labelText: '비밀번호'), obscureText: true),
+          TextField(
+            controller: _passwordCtrl,
+            decoration: const InputDecoration(labelText: '비밀번호'),
+            obscureText: true,
+          ),
           const SizedBox(height: 16),
-          TextField(controller: _passwordConfirmCtrl, decoration: const InputDecoration(labelText: '비밀번호 확인'), obscureText: true),
+          TextField(
+            controller: _passwordConfirmCtrl,
+            decoration: const InputDecoration(labelText: '비밀번호 확인'),
+            obscureText: true,
+          ),
         ],
       ),
     );
@@ -308,56 +473,106 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
 
   Widget _buildNicknameStep() {
     return _StepWrapper(
-        title: '처음 오셨군요, 반가워요!\n닉네임을 만들어볼까요?',
-        subtitle: '프로필에 표시되는 이름으로, 언제든 변경할 수 있어요.',
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      title: '처음 오셨군요, 반가워요!\n닉네임을 만들어볼까요?',
+      subtitle: '프로필에 표시되는 이름으로, 언제든 변경할 수 있어요.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           TextField(
-              controller: _nicknameCtrl,
-              decoration: InputDecoration(labelText: '닉네임', suffixIcon: IconButton(icon: const Icon(Icons.refresh), onPressed: _initNickname))),
+            controller: _nicknameCtrl,
+            decoration: InputDecoration(
+              labelText: '닉네임',
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _initNickname,
+              ),
+            ),
+          ),
           const SizedBox(height: 8),
-          const Text('예: 하품하는강아지123, 돈많은까마귀456', style: TextStyle(fontSize: 12, color: Colors.grey))
-        ]));
+          const Text(
+            '예: 하품하는강아지123, 돈많은까마귀456',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildProofOfEnrollmentStep() {
     return _StepWrapper(
-        title: '학생 신분 인증을 위해\n재학증명서를 업로드해 주세요.',
-        subtitle: '재학증명서는 신원 확인 용도로만 사용되며, 확인 즉시 파기돼요.',
-        child: Column(children: [
+      title: '학생 신분 인증을 위해\n재학증명서를 업로드해 주세요.',
+      subtitle: '재학증명서는 신원 확인 용도로만 사용되며, 확인 즉시 파기돼요.',
+      child: Column(
+        children: [
           OutlinedButton.icon(
-              onPressed: _pickFile,
-              icon: const Icon(Icons.upload_file),
-              label: const Text('PDF 파일 선택'),
-              style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 50))),
+            onPressed: _pickFile,
+            icon: const Icon(Icons.upload_file),
+            label: const Text('PDF 파일 선택'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+            ),
+          ),
           const SizedBox(height: 16),
           if (_pickedFileName != null)
-            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Icon(Icons.check_circle, color: Colors.green),
-              const SizedBox(width: 8),
-              Flexible(child: Text(_pickedFileName!, overflow: TextOverflow.ellipsis))
-            ])
-        ]));
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    _pickedFileName!,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _buildGenderStep() {
     return _StepWrapper(
-        title: '성별을 선택해 주세요.',
-        subtitle: '성별 정보는 상대에게 일부 공개될 수 있어요.',
-        child: Column(children: [
-          RadioListTile<Gender>(title: const Text('여성'), value: Gender.female, groupValue: _gender, onChanged: (g) => setState(() => _gender = g!)),
-          RadioListTile<Gender>(title: const Text('남성'), value: Gender.male, groupValue: _gender, onChanged: (g) => setState(() => _gender = g!))
-        ]));
+      title: '성별을 선택해 주세요.',
+      subtitle: '성별 정보는 상대에게 일부 공개될 수 있어요.',
+      child: Column(
+        children: [
+          RadioListTile<Gender>(
+            title: const Text('여성'),
+            value: Gender.female,
+            groupValue: _gender,
+            onChanged: (g) => setState(() => _gender = g!),
+          ),
+          RadioListTile<Gender>(
+            title: const Text('남성'),
+            value: Gender.male,
+            groupValue: _gender,
+            onChanged: (g) => setState(() => _gender = g!),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildMbtiStep() {
     return _StepWrapper(
-        title: 'MBTI를 알려주세요.',
-        subtitle: '대화 스타일을 이해하는 데 도움이 돼요.',
-        child: DropdownButtonFormField<String>(
-            value: _selectedMbti,
-            items: _mbtiOptions.map((mbti) => DropdownMenuItem(value: mbti, child: Text(mbti))).toList(),
-            onChanged: (v) => setState(() => _selectedMbti = v ?? _selectedMbti),
-            decoration: const InputDecoration(labelText: 'MBTI')));
+      title: 'MBTI를 알려주세요.',
+      subtitle: '대화 스타일을 이해하는 데 도움이 돼요.',
+      child: DropdownButtonFormField<String>(
+        value: _selectedMbti,
+        items: _mbtiOptions
+            .map(
+              (mbti) => DropdownMenuItem(
+            value: mbti,
+            child: Text(mbti),
+          ),
+        )
+            .toList(),
+        onChanged: (v) => setState(() => _selectedMbti = v ?? _selectedMbti),
+        decoration: const InputDecoration(labelText: 'MBTI'),
+      ),
+    );
   }
 
   Widget _buildRegionStep() {
@@ -366,23 +581,48 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
     if (!cities.contains(_selectedCity)) {
       _selectedCity = cities.first;
     }
+
     return _StepWrapper(
-        title: '주로 활동하는 지역은 어디인가요?',
-        subtitle: '선택한 지역의 봉사 파트너와 활동을 추천해 드려요.',
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      title: '주로 활동하는 지역은 어디인가요?',
+      subtitle: '선택한 지역의 봉사 파트너와 활동을 추천해 드려요.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           const Text('광역시 / 도'),
           const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            for (final p in provinces)
-              ChoiceChip(label: Text(p), selected: p == _selectedProvince, onSelected: (_) => setState(() => _selectedProvince = p))
-          ]),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final p in provinces)
+                ChoiceChip(
+                  label: Text(p),
+                  selected: p == _selectedProvince,
+                  onSelected: (_) => setState(() {
+                    _selectedProvince = p;
+                    _selectedCity =
+                        _regions[_selectedProvince]!.first; // 시/군 초기화
+                  }),
+                ),
+            ],
+          ),
           const SizedBox(height: 16),
           const Text('시 / 군'),
           DropdownButton<String>(
-              value: _selectedCity,
-              items: cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-              onChanged: (v) => setState(() => _selectedCity = v!))
-        ]));
+            value: _selectedCity,
+            items: cities
+                .map(
+                  (c) => DropdownMenuItem(
+                value: c,
+                child: Text(c),
+              ),
+            )
+                .toList(),
+            onChanged: (v) => setState(() => _selectedCity = v!),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -391,7 +631,11 @@ class _StepWrapper extends StatelessWidget {
   final String? subtitle;
   final Widget child;
 
-  const _StepWrapper({required this.title, this.subtitle, required this.child});
+  const _StepWrapper({
+    required this.title,
+    this.subtitle,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -399,10 +643,22 @@ class _StepWrapper extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       child: ListView(
         children: [
-          Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           if (subtitle != null) ...[
             const SizedBox(height: 8),
-            Text(subtitle!, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+            Text(
+              subtitle!,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Colors.grey,
+              ),
+            ),
           ],
           const SizedBox(height: 24),
           child,
