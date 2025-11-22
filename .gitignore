@@ -12,6 +12,10 @@
 .swiftpm/
 migrate_working_dir/
 frontend/build/
+*.pyc
+django_flutter_backend/venv/
+**/__pycache__/
+**/migrations/
 
 # IntelliJ related
 *.iml
