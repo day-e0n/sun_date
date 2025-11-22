@@ -18,7 +18,7 @@ class SunDateApp extends StatelessWidget {
     return MaterialApp(
       title: '선데이트',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.pinkAccent),
         textTheme: GoogleFonts.notoSansKrTextTheme(
           Theme.of(context).textTheme,
         ),
