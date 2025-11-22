@@ -1,15 +1,15 @@
 // lib/ui/onboarding/onboarding_flow_screen.dart
+import 'dart:convert';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:random_nickname/random_nickname.dart';
 
-// 여기 두 줄 패키지 경로로 통일
 import 'package:sundate/core/match_api.dart';
 import 'package:sundate/core/models.dart';
 import 'package:sundate/core/nickname_service.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert'; // jsonDecode, jsonEncode 등 사용
 
 class OnboardingFlowScreen extends StatefulWidget {
   final MatchApi api;
@@ -24,18 +24,19 @@ class OnboardingFlowScreen extends StatefulWidget {
 }
 
 class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
-  final _pageController = PageController();
+  final PageController _pageController = PageController();
   int _step = 0;
 
   // 입력 컨트롤러
-  final _studentIdCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-  final _passwordConfirmCtrl = TextEditingController();
-  final _nicknameCtrl = TextEditingController();
+  final TextEditingController _studentIdCtrl = TextEditingController();
+  final TextEditingController _passwordCtrl = TextEditingController();
+  final TextEditingController _passwordConfirmCtrl = TextEditingController();
+  final TextEditingController _nicknameCtrl = TextEditingController();
 
-  final _nicknameService = NicknameService();
+  final NicknameService _nicknameService = NicknameService();
   String? _pickedFileName;
-  String? _authToken; // /api/login 결과로 받은 토큰을 임시 저장
+  String? _pickedFilePath; // 실제 PDF 경로
+  String? _authToken;      // signup 결과 토큰
 
   Gender _gender = Gender.female;
 
@@ -154,7 +155,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedCity = _regions[_selectedProvince]?.first ?? '';
+    _selectedCity = _regions[_selectedProvince]!.first;
     _initNickname();
   }
 
@@ -191,43 +192,12 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
       if (result != null && result.files.single.path != null) {
         setState(() {
           _pickedFileName = result.files.single.name;
-          // 실제 파일 전송은 백엔드 API 확정 후 multipart로 추가 가능
+          _pickedFilePath = result.files.single.path;
         });
       }
     } catch (e) {
       _showError('파일을 선택하는 중 오류가 발생했습니다: $e');
     }
-  }
-
-  // =========================
-  // 실제 HTTP 요청 부분
-  // =========================
-
-  Future<void> _sendLoginRequest() async {
-    final studentId = _studentIdCtrl.text.trim();
-    final password = _passwordCtrl.text.trim();
-
-    final url = Uri.parse('http://220.149.241.209:8000/api/login/');
-    final resp = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'student_id': studentId, // 학번 그대로 사용
-        'password': password,
-      }),
-    );
-
-    if (resp.statusCode != 200 && resp.statusCode != 201) {
-      throw Exception(
-          '로그인 API 실패 (status: ${resp.statusCode}): ${resp.body}');
-    }
-
-    final data = jsonDecode(resp.body);
-    final token = data['token'] as String?;
-    if (token == null || token.isEmpty) {
-      throw Exception('로그인 응답에 token 필드가 없습니다.');
-    }
-    _authToken = token;
   }
 
   String _genderToString(Gender g) {
@@ -236,46 +206,38 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
         return 'male';
       case Gender.female:
         return 'female';
-      default:
-        return 'other';
     }
   }
 
+  Future<Map<String, dynamic>> _verifyDocument(
+      String token, String filePath) async {
+    final uri =
+    Uri.parse('http://220.149.241.209:8000/api/verify-document/');
 
-  Future<void> _sendProfileUpdateRequest() async {
-    if (_authToken == null) {
-      throw Exception('토큰이 없습니다. 먼저 로그인 요청이 필요합니다.');
-    }
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Token $token';
 
-    final url = Uri.parse('http://220.149.241.209:8000/api/user-profile/');
-    final resp = await http.put(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Token $_authToken',
-      },
-      body: jsonEncode({
-        'nickname': _nicknameCtrl.text.trim(),
-        'age': 20, // 실제 나이는 추후 백엔드에서 PDF 기반 추출 후 반영
-        'sex': _genderToString(_gender),
-        'mbti': _selectedMbti,
-        'location': '$_selectedProvince $_selectedCity',
-        // 질문 텍스트는 추후 온보딩에 질문 단계 추가 후 연결 가능
-        'question1': null,
-        'question2': null,
-        'question3': null,
-      }),
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'document',
+        filePath,
+      ),
     );
 
-    if (resp.statusCode != 200) {
-      throw Exception(
-          '프로필 업데이트 실패 (status: ${resp.statusCode}): ${resp.body}');
-    }
-  }
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
 
-  // =========================
-  // 온보딩 단계 제어
-  // =========================
+    if (response.statusCode != 200) {
+      throw Exception(
+          '재학증명서 검증 실패 (status: ${response.statusCode}): ${response.body}');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception('예상과 다른 verify-document 응답 형식: ${response.body}');
+    }
+    return decoded;
+  }
 
   Future<void> _next() async {
     // 단계별 검증
@@ -297,23 +259,19 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
           _showError('비밀번호가 일치하지 않습니다.');
           return;
         }
-
         break;
-
       case 1:
         if (_nicknameCtrl.text.trim().isEmpty) {
           _showError('닉네임을 입력해 주세요.');
           return;
         }
         break;
-
       case 2:
-        if (_pickedFileName == null) {
+        if (_pickedFilePath == null) {
           _showError('재학증명서를 업로드해 주세요.');
           return;
         }
         break;
-
       default:
         break;
     }
@@ -323,7 +281,6 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
       return;
     }
 
-    // 마지막 단계 아니면 다음 페이지로
     if (_step < 5) {
       setState(() => _step++);
       _pageController.animateToPage(
@@ -331,9 +288,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
       );
-      return;
     }
-
   }
 
   void _prev() {
@@ -350,13 +305,19 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
     setState(() => _saving = true);
 
     try {
+      if (_pickedFilePath == null) {
+        _showError('재학증명서를 업로드해 주세요.');
+        return;
+      }
+
+      // 1) 회원가입
       final studentId = int.parse(_studentIdCtrl.text.trim());
 
       final signupResp = await http.post(
         Uri.parse("http://220.149.241.209:8000/api/signup/"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
-          "student_id": studentId,  // 이메일 대신 학번 사용
+          "student_id": studentId,
           "password": _passwordCtrl.text.trim(),
         }),
       );
@@ -366,21 +327,58 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
         return;
       }
 
-      // 응답(JSON) 파싱
-      final data = jsonDecode(signupResp.body);
-      final token = data["token"]; // 백엔드가 토큰 발급하면 저장
+      final signupData = jsonDecode(signupResp.body);
+      final token = signupData["token"] as String?;
+      if (token == null || token.isEmpty) {
+        _showError("회원가입 응답에 token이 없습니다.");
+        return;
+      }
+      _authToken = token;
 
-      // 저장 후 Profie API 호출
-      final profileResp = await http.get(
+      // 2) 프로필 업데이트
+      final profileResp = await http.put(
         Uri.parse("http://220.149.241.209:8000/api/user-profile/"),
         headers: {
           "Authorization": "Token $token",
           "Content-Type": "application/json",
         },
+        body: jsonEncode({
+          "nickname": _nicknameCtrl.text.trim(),
+          "age": 20,
+          "sex": _genderToString(_gender),
+          "mbti": _selectedMbti,
+          "location": "$_selectedProvince $_selectedCity",
+        }),
       );
-      context.go('/login', extra: {'message': '회원가입이 완료되었습니다. 로그인해주세요.'});
+
+      if (profileResp.statusCode != 200) {
+        _showError("프로필 업데이트 실패: ${profileResp.body}");
+        return;
+      }
+
+      // 3) 재학증명서 검증
+      final verifyResult = await _verifyDocument(token, _pickedFilePath!);
+      final status = verifyResult['status'] as String? ?? 'failed';
+      final message = verifyResult['message'] as String? ?? '';
+      final discrepancies =
+          (verifyResult['discrepancies'] as List?)?.cast<String>() ?? const [];
+
+      if (status != 'success') {
+        final reason = [
+          message,
+          if (discrepancies.isNotEmpty) '사유: ${discrepancies.join(", ")}',
+        ].where((e) => e.isNotEmpty).join('\n');
+        _showError('재학증명서 검증 실패\n$reason');
+        return;
+      }
+
+      if (!mounted) return;
+      context.go(
+        '/login',
+        extra: {'message': '회원가입 및 재학증명서 검증이 완료되었습니다. 로그인해 주세요.'},
+      );
     } catch (e) {
-      _showError('회원가입 중 오류: $e');
+      _showError('회원가입/검증 중 오류: $e');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -388,7 +386,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final progress = (_step + 1) / 6;
+    final double progress = (_step + 1) / 6;
 
     return Scaffold(
       appBar: AppBar(
@@ -429,9 +427,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
     );
   }
 
-  // =========================
-  // 각 스텝 UI
-  // =========================
+  // ============= 각 스텝 UI =============
 
   Widget _buildAuthStep() {
     return _StepWrapper(
@@ -593,7 +589,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
                   onSelected: (_) => setState(() {
                     _selectedProvince = p;
                     _selectedCity =
-                        _regions[_selectedProvince]!.first; // 시/군 초기화
+                        _regions[_selectedProvince]!.first;
                   }),
                 ),
             ],
