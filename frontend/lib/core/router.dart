@@ -22,7 +22,7 @@ GoRouter createRouter(MatchApi api) {
       ),
       GoRoute(
         path: '/signup',
-        builder: (context, state) => OnboardingFlowScreen(api: api),
+        builder: (context, state) => const OnboardingFlowScreen(),
       ),
       GoRoute(
         path: '/fixed-questions',

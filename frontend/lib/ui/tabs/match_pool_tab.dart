@@ -26,6 +26,29 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
   void initState() {
     super.initState();
     _loadTokenAndFetchUsers();
+    _checkFixedQuestions(); // 고정 질문 확인
+  }
+
+  Future<void> _checkFixedQuestions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final q1 = prefs.getString('fixed_question_1') ?? '';
+    final q2 = prefs.getString('fixed_question_2') ?? '';
+    final q3 = prefs.getString('fixed_question_3') ?? '';
+
+    if (q1.isEmpty || q2.isEmpty || q3.isEmpty) {
+      // 고정 질문이 없으면 안내
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('프로필 탭에서 매칭 질문을 먼저 설정해주세요!'),
+              duration: Duration(seconds: 3),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        });
+      }
+    }
   }
 
   Future<void> _loadTokenAndFetchUsers() async {
@@ -55,60 +78,78 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
     }
   }
 
-  // 서버에서 사용자 목록 불러오기
+  // 서버에서 사용자 목록 불러오기 (실패시 MockApi 사용)
   Future<void> _fetchUsersByCategory(VolunteerCategory category) async {
-    if (_authToken == null) {
-      await _loadToken();
-      if(_authToken == null) {
-        print("Auth token is not available.");
-        return;
-      }
-    }
-
     setState(() => _loading = true);
 
-    final url = Uri.parse("http://220.149.241.209:8000/api/volunteer-search/");
     try {
-      final resp = await http.post(
-        url,
-        headers: {
-          "Authorization": "Token $_authToken",
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode({
-          "volunteer_field": _categoryToServerString(category),
-        }),
-      );
-
-      if (resp.statusCode != 200) {
-        print("검색 실패: ${resp.body}");
-        setState(() => _loading = false);
-        return;
+      // 1. 서버 API 시도
+      if (_authToken == null) {
+        await _loadToken();
       }
 
-      final List<dynamic> data = jsonDecode(utf8.decode(resp.bodyBytes));
+      if (_authToken != null) {
+        final url = Uri.parse("http://220.149.241.209:8000/api/volunteer-search/");
+        final resp = await http.post(
+          url,
+          headers: {
+            "Authorization": "Token $_authToken",
+            "Content-Type": "application/json",
+          },
+          body: jsonEncode({
+            "volunteer_field": _categoryToServerString(category),
+          }),
+        );
 
-      setState(() {
-        _users = data.map((e) {
-          return UserProfile(
-            studentId: e["student_id"] ?? "", // API 응답에 student_id가 없어 임시 처리
-            nickname: e["nickname"] ?? "",
-            age: e["age"] ?? 0,
-            sex: e["sex"] ?? "unknown",
-            mbti: e["mbti"] ?? "",
-            location: e["location"] ?? "",
-            volunteerField: e["volunteer_field"],
-          );
-        }).toList();
-        _loading = false;
-      });
+        if (resp.statusCode == 200) {
+          final List<dynamic> data = jsonDecode(utf8.decode(resp.bodyBytes));
+
+          setState(() {
+            _users = data.map((e) {
+              return UserProfile(
+                studentId: e["student_id"] ?? "",
+                nickname: e["nickname"] ?? "",
+                age: e["age"] ?? 0,
+                sex: e["sex"] ?? "unknown",
+                mbti: e["mbti"] ?? "",
+                location: e["location"] ?? "",
+                volunteerField: e["volunteer_field"],
+              );
+            }).toList();
+            _loading = false;
+          });
+          return;
+        }
+      }
     } catch (e) {
-        print("An error occurred: $e");
-        setState(() => _loading = false);
+      print("서버 API 호출 실패, MockApi 사용: $e");
+    }
+
+    // 2. 서버 API 실패시 MockApi의 더미 데이터 사용
+    try {
+      final candidates = await widget.api.listCandidates(
+        userId: widget.currentUser.studentId,
+        categoryFilter: category,
+      );
+
+      if (mounted) {
+        setState(() {
+          _users = candidates;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      print("MockApi 호출도 실패: $e");
+      if (mounted) {
+        setState(() {
+          _users = [];
+          _loading = false;
+        });
+      }
     }
   }
 
-  // 매칭 요청 보내기 (이전 로직 사용)
+  // 매칭 요청 보내기
   Future<void> _handleSendRequest(UserProfile toUser) async {
     final prefs = await SharedPreferences.getInstance();
     final q1 = prefs.getString('fixed_question_1') ?? '';
@@ -117,34 +158,53 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
 
     if (q1.isEmpty || q2.isEmpty || q3.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('프로필 탭에서 고정 질문을 먼저 설정해주세요.')),
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('질문 설정 필요'),
+          content: const Text('매칭 요청을 보내려면\n프로필 탭에서 고정 질문 3개를\n먼저 설정해주세요.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
       );
       return;
     }
 
-    // MatchApi의 sendMatchRequest는 아직 UserProfile의 예전 모델을 사용하고 있을 수 있음.
-    // 우선 UI단에서 toUser의 studentId가 없다는 것을 인지해야 함.
     if (toUser.studentId.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('요청을 보낼 사용자의 학번 정보가 없습니다.')),
-        );
-        return;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('요청을 보낼 사용자의 학번 정보가 없습니다.')),
+      );
+      return;
     }
 
-    await widget.api.sendMatchRequest(
-      fromUserId: widget.currentUser.studentId,
-      toUser: toUser,
-      questions: [q1, q2, q3],
-    );
+    try {
+      await widget.api.sendMatchRequest(
+        fromUserId: widget.currentUser.studentId,
+        toUser: toUser,
+        questions: [q1, q2, q3],
+      );
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${toUser.nickname}님에게 매칭 요청을 보냈습니다.')),
-    );
-    setState(() {
-      _selectedUserId = null;
-    });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${toUser.nickname}님에게 매칭 요청을 보냈습니다!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      setState(() {
+        _selectedUserId = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('매칭 요청 실패: $e')),
+      );
+    }
   }
 
   static String _categoryLabel(VolunteerCategory c) {
@@ -204,27 +264,82 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
 
                 return Card(
                   elevation: isSelected ? 4 : 1,
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: InkWell(
                     onTap: () {
                       setState(() => _selectedUserId =
-                      isSelected ? null : user.nickname);
+                      isSelected ? null : user.studentId);
                     },
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(user.nickname,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold)),
-                          Text('${user.age}세 / ${user.location}'),
-                          Text('MBTI: ${user.mbti}'),
-                          if (isSelected)
-                            FilledButton(
-                              onPressed: () =>
-                                  _handleSendRequest(user),
-                              child: const Text("매칭 요청 보내기"),
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: Colors.pinkAccent.shade100,
+                                child: Text(
+                                  user.nickname.isNotEmpty ? user.nickname[0] : '?',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      user.nickname,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${user.age}세 · ${user.sex == "male" ? "남성" : "여성"} · ${user.location}',
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              Chip(
+                                label: Text('MBTI: ${user.mbti}'),
+                                backgroundColor: Colors.blue.shade50,
+                                labelStyle: const TextStyle(fontSize: 12),
+                              ),
+                              if (user.volunteerField != null)
+                                Chip(
+                                  label: Text(user.volunteerField!),
+                                  backgroundColor: Colors.green.shade50,
+                                  labelStyle: const TextStyle(fontSize: 12),
+                                ),
+                            ],
+                          ),
+                          if (isSelected) ...[
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                onPressed: () => _handleSendRequest(user),
+                                icon: const Icon(Icons.send),
+                                label: const Text("매칭 요청 보내기"),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.pinkAccent,
+                                ),
+                              ),
                             ),
+                          ],
                         ],
                       ),
                     ),

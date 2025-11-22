@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle; // 파일 읽기용
-import 'package:csv/csv.dart'; // CSV 파싱용
 import '../../core/match_api.dart';
 import '../../core/models.dart';
 import 'volunteer_detail_screen.dart';
@@ -42,64 +40,151 @@ class _AgencyTabState extends State<AgencyTab> {
   @override
   void initState() {
     super.initState();
-    _loadCsvData(); // CSV 로드 시작
+    _loadActivities(); // 활동 데이터 로드
   }
 
-  // CSV 파일 로드 및 파싱 함수 (수정됨)
-  Future<void> _loadCsvData() async {
+  // 봉사활동 데이터 로드 (더미 데이터 직접 생성)
+  Future<void> _loadActivities() async {
+    debugPrint("🔄 봉사활동 데이터 로드 시작");
+    
     try {
-      // 1. CSV 파일 읽기
-      final rawData = await rootBundle.loadString('assets/volunteers.csv');
+      // 약간의 지연으로 로딩 표시
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // 더미 데이터 생성
+      final List<VolunteerActivity> activities = [
+        VolunteerActivity(
+          id: 'v1',
+          title: '유기동물 산책 및 놀이 보조',
+          agencyName: '부산시 동물보호센터',
+          category: '동물 돌봄',
+          dateAndTime: '2025-11-25 ~ 2025-12-20, 10:00~13:00',
+          days: '화·목',
+          location: '부산광역시 북구',
+          description: '유기동물의 산책을 돕고 놀이 활동을 보조하는 역할입니다.',
+          requirements: ['반려동물 친화적 성향'],
+        ),
+        VolunteerActivity(
+          id: 'v2',
+          title: '고양이 보호실 청소 및 사회화 활동',
+          agencyName: '대구 반려동물 복지센터',
+          category: '동물 돌봄',
+          dateAndTime: '2025-11-30 ~ 2026-01-15, 14:00~17:00',
+          days: '수·금',
+          location: '대구광역시 수성구',
+          description: '보호 중인 고양이 사회화 및 환경 정리 활동입니다.',
+          requirements: ['고양이 알레르기 없음'],
+        ),
+        VolunteerActivity(
+          id: 'v3',
+          title: '독거어르신 말벗 및 안부 확인',
+          agencyName: '서울중앙복지센터',
+          category: '이웃 돌봄',
+          dateAndTime: '2025-11-25 ~ 2026-01-10, 10:00~13:00',
+          days: '월·목',
+          location: '서울특별시 중구',
+          description: '독거 어르신 방문해 말벗 및 안전 확인.',
+          requirements: ['기본 의사소통 가능자'],
+        ),
+        VolunteerActivity(
+          id: 'v4',
+          title: '치매 어르신 프로그램 보조',
+          agencyName: '부산 서구 노인복지관',
+          category: '이웃 돌봄',
+          dateAndTime: '2025-12-01 ~ 2026-02-01, 13:00~17:00',
+          days: '화·금',
+          location: '부산광역시 서구',
+          description: '치매 어르신 프로그램 보조 및 정서 지원.',
+          requirements: ['치매 교육 이수자 우대'],
+        ),
+        VolunteerActivity(
+          id: 'v5',
+          title: '해변 쓰레기 수거 및 친환경 캠페인',
+          agencyName: '부산 해양환경보호센터',
+          category: '환경보호',
+          dateAndTime: '2025-11-25 ~ 2026-01-10, 10:00~13:00',
+          days: '토',
+          location: '부산광역시 해운대구',
+          description: '해변 쓰레기 수거 및 친환경 캠페인 지원.',
+          requirements: ['야외 활동 가능자'],
+        ),
+        VolunteerActivity(
+          id: 'v6',
+          title: '도심 미세먼지 저감 거리정화',
+          agencyName: '서울 녹색지구재단',
+          category: '환경보호',
+          dateAndTime: '2025-11-28 ~ 2026-02-01, 09:00~12:00',
+          days: '수·금',
+          location: '서울특별시 성동구',
+          description: '거리 청소 및 식재 관리.',
+          requirements: ['간단한 작업 가능'],
+        ),
+        VolunteerActivity(
+          id: 'v7',
+          title: '초등학생 기초학습 멘토링',
+          agencyName: '서울동부지역아동센터',
+          category: '교육·멘토링',
+          dateAndTime: '2025-11-25 ~ 2026-02-25, 15:00~18:00',
+          days: '월·수',
+          location: '서울특별시 광진구',
+          description: '초등 기초 학습 지도.',
+          requirements: ['학습 지도 경험자 우대'],
+        ),
+        VolunteerActivity(
+          id: 'v8',
+          title: '중학생 영어회화 스터디 코치',
+          agencyName: '부산 청소년배움터',
+          category: '교육·멘토링',
+          dateAndTime: '2025-11-30 ~ 2026-01-30, 16:00~18:00',
+          days: '금',
+          location: '부산광역시 진구',
+          description: '중학생 영어 회화 연습 지도.',
+          requirements: ['기본 회화 능력'],
+        ),
+        VolunteerActivity(
+          id: 'v9',
+          title: '지역 도서관 자료 정리 및 대출 보조',
+          agencyName: '서울시 공공도서관 연합',
+          category: '기타',
+          dateAndTime: '2025-11-26 ~ 2026-01-15, 13:00~16:00',
+          days: '화·금',
+          location: '서울특별시 송파구',
+          description: '도서 정리·대출 보조 및 이용자 안내.',
+          requirements: ['정리 능력'],
+        ),
+        VolunteerActivity(
+          id: 'v10',
+          title: '문화행사 안내 및 운영 보조',
+          agencyName: '부산 시민문화재단',
+          category: '기타',
+          dateAndTime: '2025-12-01 ~ 2026-02-01, 14:00~18:00',
+          days: '토·일',
+          location: '부산광역시 남구',
+          description: '문화행사 안내·운영 지원.',
+          requirements: ['대외활동 가능자'],
+        ),
+      ];
 
-      // 2. CSV 파싱 (중요: eol 설정을 '\n'으로 강제하여 OS 호환성 확보)
-      List<List<dynamic>> listData =
-      const CsvToListConverter(eol: '\n').convert(rawData);
-
-      // 만약 위 설정으로 파싱이 안돼서 행이 1개 이하라면, 기본 설정으로 재시도 (안전장치)
-      if (listData.length <= 1) {
-        listData = const CsvToListConverter().convert(rawData);
-      }
-
-      List<VolunteerActivity> activities = [];
-
-      // 헤더(0번) 제외하고 1번부터 시작
-      for (var i = 1; i < listData.length; i++) {
-        final row = listData[i];
-
-        // 데이터 유효성 검사: 컬럼이 8개여야 함
-        if (row.length < 8) continue;
-
-        try {
-          activities.add(VolunteerActivity(
-            id: 'csv_$i',
-            title: row[0].toString(),
-            agencyName: row[1].toString(),
-            category: row[2].toString(),
-            dateAndTime: row[3].toString(),
-            days: row[4].toString(),
-            location: row[5].toString(),
-            description: row[6].toString(),
-            // 요구사항: 쉼표로 구분된 문자열을 리스트로 변환
-            requirements:
-            row[7].toString().split(',').map((e) => e.trim()).toList(),
-          ));
-        } catch (e) {
-          debugPrint("Error parsing row $i: $e");
-        }
-      }
+      debugPrint("✅ 총 ${activities.length}개 봉사활동 생성 완료");
 
       if (mounted) {
         setState(() {
           _allActivities = activities;
           _isLoading = false;
         });
+        debugPrint("✅ UI 업데이트 완료 - 화면에 표시됨");
       }
-    } catch (e) {
-      debugPrint("Error loading CSV: $e");
+    } catch (e, stackTrace) {
+      debugPrint("❌ 데이터 로드 에러: $e");
+      debugPrint("스택: $stackTrace");
+      
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('데이터 로드 실패: $e')),
+        );
       }
     }
   }
