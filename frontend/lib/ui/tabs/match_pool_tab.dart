@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sundate/core/match_api.dart';
 import 'package:sundate/core/models.dart';
+import 'package:http/http.dart' as http;
 
 class MatchPoolTab extends StatefulWidget {
   final MatchApi api;
@@ -14,47 +16,83 @@ class MatchPoolTab extends StatefulWidget {
 }
 
 class _MatchPoolTabState extends State<MatchPoolTab> {
-  // 더미 데이터 생성 (카테고리 다양화)
-  final List<UserProfile> _dummyUsers = List.generate(10, (i) {
-    return UserProfile(
-      studentId: '2024000$i',
-      nickname: '테스트유저$i',
-      age: 20 + i,
-      gender: i % 2 == 0 ? Gender.male : Gender.female,
-      mbti: ['INFP', 'ENFP', 'ISTJ', 'ESTJ'][i % 4],
-      region: ['서울', '경기', '인천', '부산'][i % 4],
-      // 카테고리를 다양하게 분포
-      preferredCategories: [
-        if (i % 3 == 0) VolunteerCategory.animal,
-        if (i % 3 == 1) VolunteerCategory.education,
-        if (i % 3 == 2) VolunteerCategory.nursingHome,
-        if (i > 7) VolunteerCategory.environment,
-      ],
-      preferredTimeSlots: [[TimeSlot.afternoon], [TimeSlot.morning]][i % 2],
-      preferredRegion: ['서울', '경기'][i % 2],
-    );
-  });
-
-  // 선택된 사용자 및 카테고리 추적
+  List<UserProfile> _users = [];
+  VolunteerCategory _selectedCategory = VolunteerCategory.animal;
+  String? _authToken;
+  bool _loading = false;
   String? _selectedUserId;
-  VolunteerCategory _selectedCategory = VolunteerCategory.animal; // '전체'를 없애고 기본값 설정
 
-  // 카테고리 라벨 헬퍼
-  static String _categoryLabel(VolunteerCategory c) {
+  @override
+  void initState() {
+    super.initState();
+    _loadToken();
+    _fetchUsersByCategory(_selectedCategory);
+  }
+
+  Future<void> _loadToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    _authToken = prefs.getString("auth_token");
+  }
+
+  // Convert VolunteerCategory → 서버에서 기대하는 volunteer_field 문자열
+  String _categoryToServerString(VolunteerCategory c) {
     switch (c) {
       case VolunteerCategory.animal:
-        return '동물 돌봄';
-      case VolunteerCategory.nursingHome:
-        return '이웃 돌봄';
-      case VolunteerCategory.environment:
-        return '환경보호';
+        return "동물";
       case VolunteerCategory.education:
-        return '교육·멘토링';
+        return "교육·멘토링";
+      case VolunteerCategory.environment:
+        return "환경보호";
+      case VolunteerCategory.nursingHome:
+        return "이웃 돌봄";
       default:
-        return '기타';
+        return "기타";
     }
   }
 
+  // 서버에서 사용자 목록 불러오기
+  Future<void> _fetchUsersByCategory(VolunteerCategory category) async {
+    if (_authToken == null) return;
+
+    setState(() => _loading = true);
+
+    final url = Uri.parse("http://220.149.241.209:8000/api/volunteer-search/");
+    final resp = await http.post(
+      url,
+      headers: {
+        "Authorization": "Token $_authToken",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "volunteer_field": _categoryToServerString(category),
+      }),
+    );
+
+    if (resp.statusCode != 200) {
+      print("검색 실패: ${resp.body}");
+      setState(() => _loading = false);
+      return;
+    }
+
+    final List<dynamic> data = jsonDecode(resp.body);
+
+    setState(() {
+      _users = data.map((e) {
+        return UserProfile(
+          studentId: "",
+          nickname: e["nickname"] ?? "",
+          age: e["age"] ?? 0,
+          gender: (e["sex"] == "male") ? Gender.male : Gender.female,
+          mbti: e["mbti"] ?? "",
+          region: e["location"] ?? "",
+          preferredCategories: [category],
+        );
+      }).toList();
+      _loading = false;
+    });
+  }
+
+  // 매칭 요청 보내기 (이전 로직 사용)
   Future<void> _handleSendRequest(UserProfile toUser) async {
     final prefs = await SharedPreferences.getInstance();
     final q1 = prefs.getString('fixed_question_1') ?? '';
@@ -84,28 +122,31 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
     });
   }
 
-  void _onCategorySelected(VolunteerCategory category) {
-    setState(() {
-      _selectedCategory = category;
-      _selectedUserId = null; // 필터 변경 시 카드 선택 해제
-    });
+  static String _categoryLabel(VolunteerCategory c) {
+    switch (c) {
+      case VolunteerCategory.animal:
+        return '동물 돌봄';
+      case VolunteerCategory.nursingHome:
+        return '이웃 돌봄';
+      case VolunteerCategory.environment:
+        return '환경보호';
+      case VolunteerCategory.education:
+        return '교육·멘토링';
+      default:
+        return '기타';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 선택된 카테고리에 따라 사용자 목록 필터링
-    final filteredUsers = _dummyUsers.where((user) => user.preferredCategories.contains(_selectedCategory)).toList();
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('상대 찾기'),
-      ),
+      appBar: AppBar(title: const Text('상대 찾기')),
       body: Column(
         children: [
-          // 1. 카테고리 필터 UI
+          // 카테고리 선택
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.all(8),
             child: Wrap(
               spacing: 8,
               children: VolunteerCategory.values.map((category) {
@@ -114,7 +155,8 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
                   selected: _selectedCategory == category,
                   onSelected: (selected) {
                     if (selected) {
-                      _onCategorySelected(category);
+                      setState(() => _selectedCategory = category);
+                      _fetchUsersByCategory(category);
                     }
                   },
                 );
@@ -122,77 +164,43 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
             ),
           ),
           const Divider(height: 1),
-          // 2. 필터링된 후보자 목록
+
+          // 사용자 목록
           Expanded(
-            child: filteredUsers.isEmpty
-                ? const Center(
-              child: Text('해당 카테고리에 맞는 상대가 없습니다.'),
-            )
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _users.isEmpty
+                ? const Center(child: Text("해당 카테고리에 맞는 상대가 없습니다."))
                 : ListView.builder(
-              padding: const EdgeInsets.all(8),
-              itemCount: filteredUsers.length,
+              itemCount: _users.length,
               itemBuilder: (context, index) {
-                final user = filteredUsers[index];
-                final isSelected = _selectedUserId == user.studentId;
+                final user = _users[index];
+                final isSelected = _selectedUserId == user.nickname;
 
                 return Card(
                   elevation: isSelected ? 4 : 1,
-                  margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                  clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: () {
-                      setState(() {
-                        if (isSelected) {
-                          _selectedUserId = null;
-                        } else {
-                          _selectedUserId = user.studentId;
-                        }
-                      });
+                      setState(() => _selectedUserId =
+                      isSelected ? null : user.nickname);
                     },
-                    child: AnimatedSize(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                CircleAvatar(child: Text(user.nickname.substring(0, 1))),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(user.nickname, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                      const SizedBox(height: 4),
-                                      Text('${user.age}세 / ${user.gender == Gender.male ? '남' : '여'} / ${user.region}'),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(user.nickname,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold)),
+                          Text('${user.age}세 / ${user.region}'),
+                          Text('MBTI: ${user.mbti}'),
+                          if (isSelected)
+                            FilledButton(
+                              onPressed: () =>
+                                  _handleSendRequest(user),
+                              child: const Text("매칭 요청 보내기"),
                             ),
-                            const SizedBox(height: 8),
-                            Text('MBTI: ${user.mbti}'),
-                            const SizedBox(height: 2),
-                            Text('선호 봉사: ${user.preferredCategories.map(_categoryLabel).join(', ')}'),
-                            if (isSelected)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 16.0),
-                                child: SizedBox(
-                                  width: double.infinity,
-                                  child: FilledButton(
-                                    onPressed: () => _handleSendRequest(user),
-                                    style: FilledButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                    ),
-                                    child: const Text('매칭 요청 보내기'),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
+                        ],
                       ),
                     ),
                   ),

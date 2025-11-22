@@ -55,8 +55,6 @@ class MockMatchApi implements MatchApi {
       mbti: mbti,
       region: '서울',
       preferredCategories: [VolunteerCategory.animal],
-      preferredTimeSlots: [TimeSlot.afternoon],
-      preferredRegion: '서울',
     );
     _userRecords[studentId] = _UserRecord(profile: profile, password: password);
   }

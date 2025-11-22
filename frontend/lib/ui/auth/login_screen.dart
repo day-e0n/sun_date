@@ -1,7 +1,9 @@
+// lib/ui/auth/login_screen.dart
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/match_api.dart';
@@ -10,23 +12,26 @@ class LoginScreen extends StatefulWidget {
   final MatchApi api;
   final String? successMessage;
 
-  const LoginScreen({super.key, required this.api, this.successMessage});
+  const LoginScreen({
+    super.key,
+    required this.api,
+    this.successMessage,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _studentIdCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
+  final TextEditingController _studentIdCtrl = TextEditingController();
+  final TextEditingController _passwordCtrl = TextEditingController();
   bool _loading = false;
 
   @override
   void initState() {
     super.initState();
-    // Show success message if coming from signup
+    // 회원가입 후 넘어올 때 성공 메시지 표시
     if (widget.successMessage != null) {
-      // Post a frame to ensure Scaffold is available
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(widget.successMessage!)),
@@ -53,20 +58,55 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
 
     try {
-      final profile = await widget.api.login(
-        studentId: _studentIdCtrl.text.trim(),
-        password: _passwordCtrl.text.trim(),
+      // 1) 로그인: 토큰 받기
+      final loginResp = await http.post(
+        Uri.parse('http://220.149.241.209:8000/api/login/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'student_id': _studentIdCtrl.text.trim(),
+          'password': _passwordCtrl.text.trim(),
+        }),
       );
 
+      if (loginResp.statusCode != 200 && loginResp.statusCode != 201) {
+        throw Exception('로그인 실패: ${loginResp.body}');
+      }
+
+      final loginData = jsonDecode(loginResp.body) as Map<String, dynamic>;
+      final token = loginData['token'] as String?;
+      if (token == null || token.isEmpty) {
+        throw Exception('서버 응답에 token이 없습니다.');
+      }
+
+      // 2) 토큰을 로컬에 저장
       final prefs = await SharedPreferences.getInstance();
-      final profileJson = jsonEncode(profile.toJson());
-      await prefs.setString('user_profile', profileJson);
+      await prefs.setString('auth_token', token);
+
+      // 3) 토큰으로 프로필 조회
+      final profileResp = await http.get(
+        Uri.parse('http://220.149.241.209:8000/api/user-profile/'),
+        headers: {
+          'Authorization': 'Token $token',
+        },
+      );
+
+      if (profileResp.statusCode != 200) {
+        throw Exception('프로필 조회 실패: ${profileResp.body}');
+      }
+
+      final profileData = jsonDecode(profileResp.body);
+      // AppShell에서 jsonDecode 후 UserProfile.fromJson() 쓸 예정이므로 그대로 문자열로 저장
+      await prefs.setString('user_profile', jsonEncode(profileData));
 
       if (!mounted) return;
-      context.go('/'); // Go to AppShell
+
+      // 4) 메인 앱으로 이동 (AppShell: '/')
+      context.go('/');
+
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('학번 또는 비밀번호가 일치하지 않습니다.')),
+        SnackBar(content: Text('로그인 실패: $e')),
       );
     } finally {
       if (mounted) {
@@ -76,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _goToSignUp() {
-    context.push('/signup'); // Go to Onboarding
+    context.push('/signup'); // 온보딩 화면으로 이동
   }
 
   void _findPassword() {
@@ -100,9 +140,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 '선데이트',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -136,7 +176,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: _loading
                     ? const SizedBox(
-                        width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white))
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(color: Colors.white),
+                )
                     : const Text('로그인'),
               ),
               const SizedBox(height: 16),

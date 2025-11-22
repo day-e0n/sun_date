@@ -14,8 +14,6 @@ class UserProfile {
   final String mbti;
   final String region;
   final List<VolunteerCategory> preferredCategories;
-  final List<TimeSlot> preferredTimeSlots;
-  final String preferredRegion;
 
   UserProfile({
     required this.nickname,
@@ -25,8 +23,6 @@ class UserProfile {
     required this.mbti,
     required this.region,
     required this.preferredCategories,
-    required this.preferredTimeSlots,
-    required this.preferredRegion,
   });
 
   Map<String, dynamic> toJson() => {
@@ -37,8 +33,7 @@ class UserProfile {
         'mbti': mbti,
         'region': region,
         'preferredCategories': preferredCategories.map((e) => e.name).toList(),
-        'preferredTimeSlots': preferredTimeSlots.map((e) => e.name).toList(),
-        'preferredRegion': preferredRegion,
+
       };
 
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
@@ -51,10 +46,6 @@ class UserProfile {
         preferredCategories: (json['preferredCategories'] as List)
             .map((e) => VolunteerCategory.values.byName(e))
             .toList(),
-        preferredTimeSlots: (json['preferredTimeSlots'] as List)
-            .map((e) => TimeSlot.values.byName(e))
-            .toList(),
-        preferredRegion: json['preferredRegion'],
       );
 }
 
