@@ -199,22 +199,6 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
       _showError('파일을 선택하는 중 오류가 발생했습니다: $e');
     }
   }
-  Future<void> _updateUserProfileSex(String token) async {
-    final resp = await http.put(
-      Uri.parse("http://220.149.241.209:8000/api/user-profile/"),
-      headers: {
-        "Authorization": "Token $token",
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({
-        "sex": _gender == Gender.male ? "male" : "female"
-      }),
-    );
-
-    if (resp.statusCode != 200) {
-      throw Exception("성별 업데이트 실패: ${resp.body}");
-    }
-  }
 
   Future<void> _next() async {
     switch (_step) {
@@ -240,18 +224,6 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
           _showError('닉네임을 입력해 주세요.');
           return;
         }
-        break;
-
-      case 2:
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('auth_token');
-
-        if (token == null) {
-          _showError('토큰이 없습니다. 로그인 후 다시 시도하세요.');
-          return;
-        }
-
-        await _updateUserProfileSex(token);
         break;
 
       case 3: // 재학증명서
