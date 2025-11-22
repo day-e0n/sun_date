@@ -23,7 +23,6 @@ class _DiscoveryTabState extends State<DiscoveryTab> {
       ),
       body: Column(
         children: [
-          // TODO: 카테고리 필터 UI
           const Divider(height: 1),
           Expanded(
             child: FutureBuilder<List<UserProfile>>(
