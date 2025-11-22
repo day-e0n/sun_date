@@ -12,9 +12,6 @@
 .swiftpm/
 migrate_working_dir/
 frontend/build/
-*.apk
-*.aab
-*.ipa
 
 # IntelliJ related
 *.iml
