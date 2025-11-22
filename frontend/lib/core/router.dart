@@ -10,7 +10,7 @@ import 'package:sundate/ui/screens/fixed_questions_screen.dart'; // 수정
 
 GoRouter createRouter(MatchApi api) {
   return GoRouter(
-    initialLocation: '/login',
+  initialLocation: '/login',
     routes: [
       GoRoute(
         path: '/login',
