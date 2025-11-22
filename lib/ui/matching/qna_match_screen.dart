@@ -20,15 +20,22 @@ class QnaMatchScreen extends StatefulWidget {
 
 class _QnaMatchScreenState extends State<QnaMatchScreen> {
   MatchSession? _session;
-  List<QnaMessage> _messages = [];
-  final _questionCtrl = TextEditingController();
+  List<QnaMessage> _questions = [];
+  final List<TextEditingController> _answerCtrls = [];
   bool _loading = false;
-  int _selfQuestionCount = 0;
 
   @override
   void initState() {
     super.initState();
     _initMatchIfNeeded();
+  }
+
+  @override
+  void dispose() {
+    for (var ctrl in _answerCtrls) {
+      ctrl.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> _initMatchIfNeeded() async {
@@ -46,61 +53,50 @@ class _QnaMatchScreenState extends State<QnaMatchScreen> {
 
   Future<void> _refreshMessages() async {
     if (_session == null) return;
-    final msgs =
-    await widget.api.getConversation(matchId: _session!.id);
-    if (mounted) setState(() => _messages = msgs);
-  }
-
-  Future<void> _sendQuestion() async {
-    if (_session == null || widget.currentUser == null) return;
-    if (_selfQuestionCount >= 3) return;
-    final text = _questionCtrl.text.trim();
-    if (text.isEmpty) return;
-
-    setState(() => _loading = true);
-    try {
-      await widget.api.sendQuestion(
-        matchId: _session!.id,
-        fromUserId: widget.currentUser!.id,
-        content: text,
-      );
-      _selfQuestionCount++;
-      _questionCtrl.clear();
-      await _refreshMessages();
-    } finally {
-      if (mounted) setState(() => _loading = false);
+    final msgs = await widget.api.getConversation(matchId: _session!.id);
+    if (mounted) {
+      setState(() {
+        _questions = msgs.where((m) => m.sender == MessageSender.partner).toList();
+        // 질문 수에 맞게 답변 컨트롤러 초기화
+        _answerCtrls.forEach((c) => c.dispose());
+        _answerCtrls.clear();
+        for (int i = 0; i < _questions.length; i++) {
+          _answerCtrls.add(TextEditingController());
+        }
+      });
     }
   }
 
-  // 테스트용: 실제론 상대 단말에서 sendAnswer 호출
-  Future<void> _sendAnswerAsPartner() async {
-    if (_session == null) return;
-    if (_messages.isEmpty) return;
-    setState(() => _loading = true);
-    try {
-      await widget.api.sendAnswer(
-        matchId: _session!.id,
-        fromUserId: _session!.partnerUserId,
-        content: '테스트 답변입니다.',
-      );
-      await _refreshMessages();
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _finish(bool ok) async {
+  Future<void> _sendAnswers() async {
     if (_session == null || widget.currentUser == null) return;
+
+    final answers = _answerCtrls.map((c) => c.text.trim()).toList();
+    if (answers.any((a) => a.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('모든 질문에 답변해주세요.')),
+      );
+      return;
+    }
+
     setState(() => _loading = true);
     try {
-      await widget.api.finishMatch(
-        matchId: _session!.id,
-        userId: widget.currentUser!.id,
-        accepted: ok,
-      );
+      // 여러 답변을 순차적으로 전송
+      for (final answer in answers) {
+        await widget.api.sendAnswer(
+          matchId: _session!.id,
+          fromUserId: widget.currentUser!.id,
+          content: answer,
+        );
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ok ? '이 파트너와 계속 진행합니다.' : '매칭을 취소했습니다.')),
+        const SnackBar(content: Text('답변을 성공적으로 전송했습니다!')),
+      );
+      // 매칭 수락/종료 화면으로 이동하거나, 홈으로 복귀 등의 로직 추가 가능
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('답변 전송 실패: $e')),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -112,87 +108,110 @@ class _QnaMatchScreenState extends State<QnaMatchScreen> {
     if (widget.currentUser == null) {
       return const Center(child: Text('먼저 프로필을 완료해 주세요.'));
     }
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('1:1 QnA 매칭')),
+      appBar: AppBar(title: const Text('1:1 QnA')),
       body: Column(
         children: [
           Expanded(
-            child: _loading && _messages.isEmpty
+            child: _loading && _questions.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : ListView.builder(
               padding: const EdgeInsets.all(8),
-              itemCount: _messages.length,
+              // 질문과 답변 쌍으로 아이템 수 설정
+              itemCount: _questions.length * 2,
               itemBuilder: (ctx, i) {
-                final m = _messages[i];
-                final isSelf =
-                    m.sender == MessageSender.self;
-                return Align(
-                  alignment: isSelf
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 6, horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: isSelf
-                          ? Colors.pink.shade100
-                          : Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(m.content),
-                  ),
-                );
+                final questionIndex = i ~/ 2;
+                final isQuestion = i % 2 == 0;
+
+                if (isQuestion) {
+                  // 질문 버블
+                  final q = _questions[questionIndex];
+                  return _buildMessageBubble(
+                    message: q.content,
+                    isSelf: false,
+                    colorScheme: colorScheme,
+                  );
+                } else {
+                  // 답변 입력 버블
+                  return _buildAnswerInputBubble(
+                    controller: _answerCtrls[questionIndex],
+                    colorScheme: colorScheme,
+                  );
+                }
               },
             ),
           ),
           const Divider(),
           Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _questionCtrl,
-                        decoration: InputDecoration(
-                          labelText:
-                          '질문 입력 (남은 질문 ${3 - _selfQuestionCount})',
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed:
-                      _loading ? null : _sendQuestion,
-                      icon: const Icon(Icons.send),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed:
-                      _loading ? null : _sendAnswerAsPartner,
-                      child: const Text('테스트 답변 받기'),
-                    ),
-                    const Spacer(),
-                    OutlinedButton(
-                      onPressed: _loading ? null : () => _finish(false),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: _loading ? null : () => _finish(true),
-                      child: const Text('OK'),
-                    ),
-                  ],
-                ),
-              ],
+            padding: const EdgeInsets.all(16),
+            child: FilledButton.icon(
+              onPressed: _loading ? null : _sendAnswers,
+              icon: const Icon(Icons.send),
+              label: const Text('답변 전송'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+              ),
             ),
           ),
         ],
       ),
     );
   }
-} 
+
+  Widget _buildMessageBubble({
+    required String message,
+    required bool isSelf,
+    required ColorScheme colorScheme,
+  }) {
+    return Align(
+      alignment: isSelf ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+        decoration: BoxDecoration(
+          color: isSelf
+              ? colorScheme.primaryContainer
+              : colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          message,
+          style: TextStyle(
+            color: isSelf
+                ? colorScheme.onPrimaryContainer
+                : colorScheme.onSecondaryContainer,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnswerInputBubble({
+    required TextEditingController controller,
+    required ColorScheme colorScheme,
+  }) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+        decoration: BoxDecoration(
+          color: colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            border: InputBorder.none,
+            hintText: '여기에 답변 입력...',
+            hintStyle: TextStyle(color: colorScheme.onPrimaryContainer.withOpacity(0.6)),
+          ),
+          style: TextStyle(color: colorScheme.onPrimaryContainer),
+          maxLines: null, // 여러 줄 입력 지원
+        ),
+      ),
+    );
+  }
+}

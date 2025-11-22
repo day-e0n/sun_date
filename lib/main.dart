@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'core/mock_match_api.dart';
 import 'ui/app_shell.dart';
 
@@ -9,6 +10,7 @@ void main() {
 
 class SunDateApp extends StatelessWidget {
   final MockMatchApi api;
+
   const SunDateApp({super.key, required this.api});
 
   @override
@@ -16,7 +18,10 @@ class SunDateApp extends StatelessWidget {
     return MaterialApp(
       title: '선데이트',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.pink),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        textTheme: GoogleFonts.notoSansKrTextTheme(
+          Theme.of(context).textTheme,
+        ),
         useMaterial3: true,
       ),
       home: AppShell(api: api),

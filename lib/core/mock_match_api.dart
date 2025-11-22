@@ -100,7 +100,30 @@ class MockMatchApi implements MatchApi {
       partnerUserId: partner.id,
     );
     _matches[matchId] = session;
-    _messagesByMatch[matchId] = [];
+    // 테스트를 위해 파트너가 보낸 3개의 질문 데이터 추가
+    _messagesByMatch[matchId] = [
+      QnaMessage(
+        id: '1',
+        matchId: matchId,
+        sender: MessageSender.partner,
+        content: '가장 기억에 남는 봉사활동 경험은 무엇인가요?',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
+      ),
+      QnaMessage(
+        id: '2',
+        matchId: matchId,
+        sender: MessageSender.partner,
+        content: '주말에 주로 어떻게 시간을 보내시나요? 취미가 궁금해요!',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 4)),
+      ),
+      QnaMessage(
+        id: '3',
+        matchId: matchId,
+        sender: MessageSender.partner,
+        content: '만약 우리가 같이 봉사를 하게 된다면, 어떤 종류의 봉사를 해보고 싶으신가요?',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 3)),
+      ),
+    ];
     return session;
   }
 
