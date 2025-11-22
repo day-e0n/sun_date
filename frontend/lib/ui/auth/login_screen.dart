@@ -48,7 +48,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    if (_studentIdCtrl.text.isEmpty || _passwordCtrl.text.isEmpty) {
+    final studentId = _studentIdCtrl.text.trim();
+    final password = _passwordCtrl.text.trim();
+
+    if (studentId.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('학번과 비밀번호를 모두 입력해주세요.')),
       );
@@ -58,15 +61,19 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
 
     try {
-      // 1) 로그인: 토큰 받기
+      // 1) 로그인 요청
+      debugPrint('=== LOGIN REQUEST START ===');
       final loginResp = await http.post(
         Uri.parse('http://220.149.241.209:8000/api/login/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'student_id': _studentIdCtrl.text.trim(),
-          'password': _passwordCtrl.text.trim(),
+          'student_id': studentId,
+          'password': password,
         }),
       );
+
+      debugPrint('LOGIN status: ${loginResp.statusCode}');
+      debugPrint('LOGIN body: ${loginResp.body}');
 
       if (loginResp.statusCode != 200 && loginResp.statusCode != 201) {
         throw Exception('로그인 실패: ${loginResp.body}');
@@ -75,14 +82,14 @@ class _LoginScreenState extends State<LoginScreen> {
       final loginData = jsonDecode(loginResp.body) as Map<String, dynamic>;
       final token = loginData['token'] as String?;
       if (token == null || token.isEmpty) {
-        throw Exception('서버 응답에 token이 없습니다.');
+        throw Exception('서버 응답에 token 필드가 없습니다.');
       }
 
-      // 2) 토큰을 로컬에 저장
+      // 2) 토큰 저장
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
 
-      // 3) 토큰으로 프로필 조회
+      // 3) 토큰으로 /api/user-profile/ 조회
       final profileResp = await http.get(
         Uri.parse('http://220.149.241.209:8000/api/user-profile/'),
         headers: {
@@ -90,21 +97,24 @@ class _LoginScreenState extends State<LoginScreen> {
         },
       );
 
+      debugPrint('PROFILE status: ${profileResp.statusCode}');
+      debugPrint('PROFILE body: ${profileResp.body}');
+
       if (profileResp.statusCode != 200) {
         throw Exception('프로필 조회 실패: ${profileResp.body}');
       }
 
-      final profileData = jsonDecode(profileResp.body);
-      // AppShell에서 jsonDecode 후 UserProfile.fromJson() 쓸 예정이므로 그대로 문자열로 저장
-      await prefs.setString('user_profile', jsonEncode(profileData));
+      // 그대로 문자열 형태로 저장 (AppShell에서 jsonDecode + UserProfile.fromJson 사용)
+      await prefs.setString('user_profile', profileResp.body);
+
+      debugPrint('=== LOGIN SUCCESS, NAVIGATE TO "/" ===');
 
       if (!mounted) return;
-
-      // 4) 메인 앱으로 이동 (AppShell: '/')
-      context.go('/');
+      context.go('/'); // 메인(AppShell)으로 이동
 
     } catch (e) {
       if (!mounted) return;
+      debugPrint('LOGIN ERROR: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('로그인 실패: $e')),
       );
@@ -116,7 +126,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _goToSignUp() {
-    context.push('/signup'); // 온보딩 화면으로 이동
+    context.push('/signup');
   }
 
   void _findPassword() {
