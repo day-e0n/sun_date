@@ -16,6 +16,7 @@ frontend/build/
 django_flutter_backend/venv/
 **/__pycache__/
 **/migrations/
+db.sqlite3
 
 # IntelliJ related
 *.iml

@@ -111,7 +111,6 @@ class DocumentVerificationView(generics.GenericAPIView):
             "status": "failed",
             "message": "Verification failed due to extraction errors or mismatches.",
             "resident_reg_no_verified": False,
-            "sex_verified": False,
             "student_id_admission_year_verified": False,
             "discrepancies": []
         }
@@ -128,25 +127,14 @@ class DocumentVerificationView(generics.GenericAPIView):
             all_verified = True
             discrepancies = []
 
-            # 1. Verify resident_reg_no for birthdate and sex
+            # 1. Verify resident_reg_no for format only (sex verification removed)
             if extracted_rrn:
                 rrn_match = re.match(r'^(\d{6})\s*[-—]\s*([1-4])', extracted_rrn)
                 if rrn_match:
-                    rrn_birthdate = rrn_match.group(1) # YYMMDD
-                    rrn_sex_digit = int(rrn_match.group(2))
-
                     verification_results["resident_reg_no_verified"] = True
-
-                    # Sex verification
-                    user_sex_map = {'male': [1,3], 'female': [2,4]}
-                    if request.user.sex and rrn_sex_digit in user_sex_map.get(request.user.sex.lower(), []):
-                        verification_results["sex_verified"] = True
-                    else:
-                        all_verified = False
-                        discrepancies.append("Sex from document does not match user's registered sex.")
                 else:
                     all_verified = False
-                    discrepancies.append("Could not parse resident registration number from document.")
+                    discrepancies.append("Could not parse resident registration number from document or incorrect format.")
             else:
                 all_verified = False
                 discrepancies.append("Resident registration number not found in document.")

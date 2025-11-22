@@ -17,7 +17,7 @@ class UserSerializer(serializers.ModelSerializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ('student_id', 'nickname', 'age', 'sex', 'mbti', 'location', 'question1', 'question2', 'question3', 'volunteer_field')
+        fields = ('student_id', 'nickname', 'age', 'sex', 'mbti', 'location', 'question1', 'question2', 'question3', 'self_answer1', 'self_answer2', 'self_answer3', 'volunteer_field')
         read_only_fields = ('student_id',)
 
     def validate_nickname(self, value):
@@ -56,7 +56,7 @@ class VolunteerSearchRequestSerializer(serializers.Serializer):
 class UserQuestionsSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ('question1', 'question2', 'question3')
+        fields = ('question1', 'self_answer1', 'question2', 'self_answer2', 'question3', 'self_answer3')
 
 
 class SingleAnswerSerializer(serializers.Serializer):
@@ -109,6 +109,5 @@ class VerificationResultSerializer(serializers.Serializer):
     status = serializers.CharField(max_length=50)
     message = serializers.CharField()
     resident_reg_no_verified = serializers.BooleanField(default=False)
-    sex_verified = serializers.BooleanField(default=False)
     student_id_admission_year_verified = serializers.BooleanField(default=False)
     discrepancies = serializers.ListField(child=serializers.CharField(), required=False)

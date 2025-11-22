@@ -44,6 +44,9 @@ class CustomUser(AbstractUser):
     question1 = models.CharField(max_length=255, blank=True, null=True)
     question2 = models.CharField(max_length=255, blank=True, null=True)
     question3 = models.CharField(max_length=255, blank=True, null=True)
+    self_answer1 = models.CharField(max_length=255, blank=True, null=True)
+    self_answer2 = models.CharField(max_length=255, blank=True, null=True)
+    self_answer3 = models.CharField(max_length=255, blank=True, null=True)
     volunteer_field = models.CharField(max_length=255, blank=True, null=True)
 
     USERNAME_FIELD = 'student_id'
