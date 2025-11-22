@@ -12,8 +12,6 @@ import 'package:http/http.dart' as http;
 import 'dart:convert'; // jsonDecode, jsonEncode 등 사용
 
 class OnboardingFlowScreen extends StatefulWidget {
-  // MatchApi는 더 이상 여기서 직접 쓰지 않고,
-  // 나중에 다른 기능에서 쓸 수 있도록 남겨두려면 주석 처리 없이 유지만 할 수 있음.
   final MatchApi api;
 
   const OnboardingFlowScreen({
@@ -214,7 +212,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'email': studentId, // 학번 그대로 사용
+        'student_id': studentId, // 학번 그대로 사용
         'password': password,
       }),
     );
@@ -347,11 +345,13 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
     setState(() => _saving = true);
 
     try {
+      final studentId = int.parse(_studentIdCtrl.text.trim());
+
       final signupResp = await http.post(
         Uri.parse("http://220.149.241.209:8000/api/signup/"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
-          "email": _studentIdCtrl.text.trim(),  // 이메일 대신 학번 사용
+          "student_id": studentId,  // 이메일 대신 학번 사용
           "password": _passwordCtrl.text.trim(),
         }),
       );

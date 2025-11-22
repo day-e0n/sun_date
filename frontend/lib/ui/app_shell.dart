@@ -28,6 +28,7 @@ class _AppShellState extends State<AppShell> {
     _loadUserProfile();
   }
 
+
   Future<void> _loadUserProfile() async {
     final prefs = await SharedPreferences.getInstance();
     final profileJson = prefs.getString('user_profile');

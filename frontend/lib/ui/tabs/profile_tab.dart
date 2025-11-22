@@ -21,6 +21,7 @@ class ProfileTab extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // 상단 프로필 영역
           ListTile(
             leading: CircleAvatar(
               radius: 28,
@@ -37,6 +38,8 @@ class ProfileTab extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const Divider(),
+
+          // 기본 정보
           ListTile(
             title: const Text('학번'),
             subtitle: Text(me.studentId),
@@ -58,21 +61,26 @@ class ProfileTab extends StatelessWidget {
                   .ifEmpty('-'),
             ),
           ),
+
           const SizedBox(height: 24),
+
           FilledButton.icon(
             onPressed: () {
-              // TODO: 프로필 수정 화면으로 네비게이션
+              // TODO: 프로필 수정 화면으로 이동
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('프로필 수정 화면은 추후 구현 예정입니다.')),
+                const SnackBar(
+                  content: Text('프로필 수정 화면은 추후 구현 예정입니다.'),
+                ),
               );
             },
             icon: const Icon(Icons.edit_outlined),
             label: const Text('프로필 수정'),
           ),
           const SizedBox(height: 8),
+
           OutlinedButton.icon(
             onPressed: () {
-               context.push('/fixed-questions');
+              context.push('/fixed-questions');
             },
             icon: const Icon(Icons.edit_note_outlined),
             label: const Text('매칭 상대에게 보낼 질문 설정'),
@@ -107,7 +115,7 @@ class ProfileTab extends StatelessWidget {
   }
 }
 
-// 작은 extension: 빈 리스트 처리용
+// 빈 문자열 처리용 extension
 extension _JoinIfEmpty on String {
   String ifEmpty(String fallback) => isEmpty ? fallback : this;
 }
