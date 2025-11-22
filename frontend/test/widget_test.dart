@@ -7,9 +7,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/core/mock_match_api.dart';
-import '../lib/core/router.dart';
-import '../main.dart';
+import 'package:sundate/core/mock_match_api.dart';
+import 'package:sundate/core/router.dart';
+import 'package:sundate/main.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {

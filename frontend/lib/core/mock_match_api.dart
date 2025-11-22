@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'match_api.dart';
-import 'models.dart';
+import 'package:sundate/core/match_api.dart';
+import 'package:sundate/core/models.dart';
 
 // Mock-up of a user record in a database
 class _UserRecord {

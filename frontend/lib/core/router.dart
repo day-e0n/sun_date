@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sundate/core/match_api.dart';
 import 'package:sundate/ui/app_shell.dart';
 import 'package:sundate/ui/auth/login_screen.dart';
 import 'package:sundate/ui/onboarding/onboarding_flow_screen.dart';
 import 'package:sundate/ui/screens/fixed_questions_screen.dart';
-
-import 'match_api.dart';
 
 GoRouter createRouter(MatchApi api) {
   return GoRouter(
