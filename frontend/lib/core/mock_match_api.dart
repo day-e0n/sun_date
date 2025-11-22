@@ -24,6 +24,30 @@ class MockMatchApi implements MatchApi {
   int _msgSeq = 0;
   int _activitySeq = 0;
 
+  // Constructor to initialize with some dummy data
+  MockMatchApi() {
+    // Add a few dummy users for testing
+    _addDummyUser('00000000', 'test', '테스트계정', 25, Gender.female, 'ENTP');
+    _addDummyUser('11111111', 'test', '김단국', 22, Gender.male, 'ISTP');
+    _addDummyUser('22222222', 'test', '최단웅', 23, Gender.female, 'ENFJ');
+  }
+
+  void _addDummyUser(String studentId, String password, String nickname, int age, Gender gender, String mbti) {
+    final profile = UserProfile(
+      nickname: nickname,
+      studentId: studentId,
+      age: age,
+      gender: gender,
+      mbti: mbti,
+      region: '서울',
+      preferredCategories: [VolunteerCategory.animal],
+      preferredTimeSlots: [TimeSlot.afternoon],
+      preferredRegion: '서울',
+    );
+    _userRecords[studentId] = _UserRecord(profile: profile, password: password);
+  }
+
+
   @override
   Future<UserProfile> signUp({
     required String nickname,
@@ -41,41 +65,14 @@ class MockMatchApi implements MatchApi {
     if (_userRecords.containsKey(studentId)) {
       throw Exception('이미 가입된 학번입니다.');
     }
-
-    final profile = UserProfile(
-      nickname: nickname,
-      studentId: studentId,
-      age: age,
-      gender: gender,
-      mbti: mbti,
-      region: region,
-      preferredCategories: preferredCategories,
-      preferredTimeSlots: preferredTimeSlots,
-      preferredRegion: preferredRegion,
-    );
-
-    _userRecords[studentId] = _UserRecord(profile: profile, password: password);
-    return profile;
+    _addDummyUser(studentId, password, nickname, age, gender, mbti);
+    return _userRecords[studentId]!.profile;
   }
 
   @override
   Future<UserProfile> login(
       {required String studentId, required String password}) async {
     await Future.delayed(const Duration(milliseconds: 200));
-
-    if (studentId == '00000000' && password == 'test') {
-      return UserProfile(
-        nickname: '테스트계정',
-        studentId: '00000000',
-        age: 25,
-        gender: Gender.female,
-        mbti: 'ENTP',
-        region: '테스트시 테스트구',
-        preferredCategories: [VolunteerCategory.animal, VolunteerCategory.education],
-        preferredTimeSlots: [TimeSlot.afternoon],
-        preferredRegion: '테스트도',
-      );
-    }
 
     final record = _userRecords[studentId];
     if (record == null || record.password != password) {
@@ -102,7 +99,7 @@ class MockMatchApi implements MatchApi {
   }) async {
     await Future.delayed(const Duration(milliseconds: 300));
     final newQuestion = SentQuestion(
-      id: 'q${'${++_qId}'}',
+      id: 'q${++_qId}',
       senderId: fromUserId,
       receiverId: toUser.studentId,
       receiverName: toUser.nickname,
@@ -119,6 +116,25 @@ class MockMatchApi implements MatchApi {
     return _sentQuestions.where((q) => q.senderId == userId).toList();
   }
 
+ @override
+  Future<List<SentQuestion>> listReceivedQuestions({required String userId}) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    return _sentQuestions.where((q) => q.receiverId == userId).toList();
+  }
+
+  @override
+  Future<void> submitAnswer(
+      {required String questionId, required List<String> answers}) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    try {
+      final question = _sentQuestions.firstWhere((q) => q.id == questionId);
+      question.answers = answers;
+      question.status = SentQuestionStatus.answered;
+    } catch (e) {
+      throw Exception('Question not found');
+    }
+  }
+
   //--- Deprecated Methods ---
 
   @Deprecated('Use sendMatchRequest instead')
@@ -128,7 +144,7 @@ class MockMatchApi implements MatchApi {
     final partner = _userRecords.values
         .map((r) => r.profile)
         .firstWhere((u) => u.studentId != userId, orElse: () => throw Exception('No partners'));
-    final matchId = 'm${'${++_matchSeq}'}';
+    final matchId = 'm${++_matchSeq}';
     final session = MatchSession(
       id: matchId,
       selfUserId: userId,
@@ -166,7 +182,7 @@ class MockMatchApi implements MatchApi {
 
   void _addMessage(String matchId, String fromUserId, String content) {
     final msg = QnaMessage(
-      id: 'msg${'${++_msgSeq}'}',
+      id: 'msg${++_msgSeq}',
       matchId: matchId,
       sender: fromUserId == _matches[matchId]!.selfUserId
           ? MessageSender.self
@@ -200,7 +216,7 @@ class MockMatchApi implements MatchApi {
       return _activityByMatch[matchId]!;
     }
     final activity = VolunteerActivity(
-      id: 'act${'${++_activitySeq}'}',
+      id: 'act${++_activitySeq}',
       title: '유기견 산책 봉사',
       description: '보호소 강아지 산책 및 환경 정리 봉사.',
       location: '경기도 용인시 ○○ 보호소',

@@ -58,6 +58,7 @@ class UserProfile {
       );
 }
 
+// --- Deprecated Models (will be removed later) ---
 class MatchSession {
   final String id;
   final String selfUserId;
@@ -87,6 +88,7 @@ class QnaMessage {
     required this.createdAt,
   });
 }
+// --- End of Deprecated Models ---
 
 class VolunteerActivity {
   final String id;
@@ -106,7 +108,6 @@ class VolunteerActivity {
   });
 }
 
-
 enum SentQuestionStatus { pending, answered, expired }
 
 class SentQuestion {
@@ -116,7 +117,8 @@ class SentQuestion {
   final String receiverName; // 상대 닉네임 (UI 표시용)
   final List<String> questions; // 보낸 질문 3개
   final DateTime createdAt; // 보낸 시각
-  final SentQuestionStatus status; // 질문 상태
+  SentQuestionStatus status; // 변경 가능해야 하므로 final 제거
+  List<String>? answers; // 답변이 없을 수 있으므로 nullable, 변경 가능
 
   SentQuestion({
     required this.id,
@@ -126,5 +128,6 @@ class SentQuestion {
     required this.questions,
     required this.createdAt,
     required this.status,
+    this.answers,
   });
 }
