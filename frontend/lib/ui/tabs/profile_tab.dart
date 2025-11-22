@@ -74,8 +74,8 @@ class ProfileTab extends StatelessWidget {
             onPressed: () {
                context.push('/fixed-questions');
             },
-            icon: const Icon(Icons.settings_outlined),
-            label: const Text('고정 질문 설정'),
+            icon: const Icon(Icons.edit_note_outlined),
+            label: const Text('매칭 상대에게 보낼 질문 설정'),
           ),
         ],
       ),

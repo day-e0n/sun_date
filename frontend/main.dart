@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:sundate/core/router.dart';
-import 'core/mock_match_api.dart';
+import 'lib/core/router.dart';
+import 'lib/core/mock_match_api.dart';
 
 void main() {
   final api = MockMatchApi();
@@ -15,7 +15,6 @@ class SunDateApp extends StatelessWidget {
   final GoRouter router;
 
   const SunDateApp({super.key, required this.router});
-
 
   @override
   Widget build(BuildContext context) {

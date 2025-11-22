@@ -4,16 +4,15 @@ abstract class MatchApi {
   // 인증
   Future<UserProfile> signUp({
     required String nickname,
-    required String studentId, // 이 값은 재학증명서 처리 후 백엔드에서 생성될 수 있음
-    required int age, // 이 값도 마찬가지
-    required String password, // 비밀번호 추가
+    required String studentId,
+    required int age,
+    required String password,
     required Gender gender,
     required String mbti,
     required String region,
     required List<VolunteerCategory> preferredCategories,
     required List<TimeSlot> preferredTimeSlots,
     required String preferredRegion,
-    // required String proofOfEnrollment, // 재학증명서 파일 경로 또는 base64
   });
 
   Future<UserProfile> login({
@@ -21,48 +20,47 @@ abstract class MatchApi {
     required String password,
   });
 
-  @Deprecated('Use signUp instead')
-  Future<UserProfile> createProfile({
-    required String nickname,
-    required String studentId,
-    required int age,
-    required Gender gender,
-    required String mbti,
-    required String region,
-    required List<VolunteerCategory> preferredCategories,
-    required List<TimeSlot> preferredTimeSlots,
-    required String preferredRegion,
-  });
-
-  // 매칭
+  // 매칭 및 질문
   Future<List<UserProfile>> listCandidates({
     required String userId,
     VolunteerCategory? categoryFilter,
   });
 
-  Future<List<MatchSession>> listMyMatches({
-    required String userId,
+  Future<void> sendMatchRequest({
+    required String fromUserId,
+    required UserProfile toUser,
+    required List<String> questions,
   });
 
+  Future<List<SentQuestion>> listSentQuestions({required String userId});
+
+  // 기존 QnA (향후 위 구조와 통합하거나 재설계 필요)
+  @Deprecated('Use sendMatchRequest instead')
   Future<MatchSession> requestMatch({required String userId});
 
-  // QnA
+  @Deprecated('Will be replaced by a new QnA model')
+  Future<List<MatchSession>> listMyMatches({required String userId});
+
+  @Deprecated('Will be replaced by a new QnA model')
   Future<void> sendQuestion({
     required String matchId,
     required String fromUserId,
     required String content,
   });
 
+  @Deprecated('Will be replaced by a new QnA model')
   Future<void> sendAnswer({
     required String matchId,
     required String fromUserId,
     required String content,
   });
 
+  @Deprecated('Will be replaced by a new QnA model')
   Future<List<QnaMessage>> getConversation({
     required String matchId,
   });
 
+  @Deprecated('Will be replaced by a new QnA model')
   Future<void> finishMatch({
     required String matchId,
     required String userId,

@@ -105,3 +105,26 @@ class VolunteerActivity {
     required this.category,
   });
 }
+
+
+enum SentQuestionStatus { pending, answered, expired }
+
+class SentQuestion {
+  final String id;
+  final String senderId; // 보낸 사람 (나)
+  final String receiverId; // 받는 사람 (상대)
+  final String receiverName; // 상대 닉네임 (UI 표시용)
+  final List<String> questions; // 보낸 질문 3개
+  final DateTime createdAt; // 보낸 시각
+  final SentQuestionStatus status; // 질문 상태
+
+  SentQuestion({
+    required this.id,
+    required this.senderId,
+    required this.receiverId,
+    required this.receiverName,
+    required this.questions,
+    required this.createdAt,
+    required this.status,
+  });
+}

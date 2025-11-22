@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sundate/ui/tabs/qna_box_tab.dart';
+import 'tabs/qna_box_tab.dart';
 import '../core/match_api.dart';
 import '../core/models.dart';
 import 'tabs/profile_tab.dart';
