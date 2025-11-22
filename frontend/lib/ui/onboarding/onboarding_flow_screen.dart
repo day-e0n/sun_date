@@ -297,7 +297,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
           _showError('비밀번호가 일치하지 않습니다.');
           return;
         }
-        await _submitProfile();
+
         break;
 
       case 1:
@@ -316,6 +316,11 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
 
       default:
         break;
+    }
+
+    if (_step == 5) {
+      await _submitProfile();
+      return;
     }
 
     // 마지막 단계 아니면 다음 페이지로
@@ -366,26 +371,13 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
       final token = data["token"]; // 백엔드가 토큰 발급하면 저장
 
       // 저장 후 Profie API 호출
-      final profileResp = await http.put(
+      final profileResp = await http.get(
         Uri.parse("http://220.149.241.209:8000/api/user-profile/"),
         headers: {
           "Authorization": "Token $token",
           "Content-Type": "application/json",
         },
-        body: jsonEncode({
-          "nickname": _nicknameCtrl.text.trim(),
-          "age": 20,
-          "sex": _gender == Gender.male ? "male" : "female",
-          "mbti": _selectedMbti,
-          "location": "$_selectedProvince $_selectedCity",
-        }),
       );
-
-      if (profileResp.statusCode != 200) {
-        _showError("프로필 저장 실패: ${profileResp.body}");
-        return;
-      }
-
       context.go('/login', extra: {'message': '회원가입이 완료되었습니다. 로그인해주세요.'});
     } catch (e) {
       _showError('회원가입 중 오류: $e');
