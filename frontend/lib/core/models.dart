@@ -83,19 +83,46 @@ class QnaMessage {
 
 class VolunteerActivity {
   final String id;
-  final String title;
-  final String description;
-  final String location;
-  final DateTime dateTime;
-  final VolunteerCategory category;
+  final String category;          // 봉사분야
+  final String title;             // 활동명
+  final String agencyName;        // 모집기관
+  final String dateAndTime;       // 봉사기간 및 시간 (CSV 컬럼 병합됨)
+  final String days;              // 활동요일 (CSV 추가)
+  final String location;          // 봉사장소
+  // currentParticipants는 CSV에 없으므로 더미 데이터나 랜덤값 사용 권장
+  final String description;       // 활동내용
+  final List<String> requirements;// 요구사항
 
   VolunteerActivity({
     required this.id,
-    required this.title,
-    required this.description,
-    required this.location,
-    required this.dateTime,
     required this.category,
+    required this.title,
+    required this.agencyName,
+    required this.dateAndTime,
+    required this.days,
+    required this.location,
+    required this.description,
+    required this.requirements,
+  });
+
+  // CSV에서 날짜와 시간을 분리해서 보여주기 위한 헬퍼 Getter
+  String get date => dateAndTime.split(',')[0].trim();
+  String get time => dateAndTime.split(',').length > 1 ? dateAndTime.split(',')[1].trim() : '';
+}
+
+// [이동] AgencyTab에서 이동해옴
+enum MatchStatus { waiting, matched, rejected }
+
+// [이동] AgencyTab에서 이동해옴
+class AppliedActivity {
+  final VolunteerActivity activity;
+  MatchStatus status;
+  final DateTime appliedAt;
+
+  AppliedActivity({
+    required this.activity,
+    this.status = MatchStatus.waiting,
+    required this.appliedAt,
   });
 }
 

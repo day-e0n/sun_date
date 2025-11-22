@@ -197,7 +197,7 @@ class MockMatchApi implements MatchApi {
 
   void _addMessage(String matchId, String fromUserId, String content) {
     final msg = QnaMessage(
-      id: 'msg${++_msgSeq}',
+      id: 'msg${'${++_msgSeq}'}',
       matchId: matchId,
       sender: fromUserId == _matches[matchId]!.selfUserId
           ? MessageSender.self
@@ -231,13 +231,17 @@ class MockMatchApi implements MatchApi {
       return _activityByMatch[matchId]!;
     }
     final activity = VolunteerActivity(
-      id: 'act${++_activitySeq}',
-      title: '유기견 산책 봉사',
-      description: '보호소 강아지 산책 및 환경 정리 봉사.',
-      location: '경기도 용인시 ○○ 보호소',
-      dateTime: DateTime(2025, 12, 1, 14, 0),
-      category: VolunteerCategory.animal,
+      id: 'mock_1',
+      category: '기타',
+      title: '모의 봉사 활동',
+      agencyName: '모의 기관',
+      dateAndTime: '2025년 12월 1일, 오후 2:00', // dateAndTime으로 통합
+      days: '월·수',                          // 필수 필드 추가
+      location: '서울 어딘가',
+      description: '테스트용 데이터',
+      requirements: ['테스트 요구사항'],       // List<String>
     );
+
     _activityByMatch[matchId] = activity;
     return activity;
   }

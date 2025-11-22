@@ -7,6 +7,7 @@ import '../core/match_api.dart';
 import '../core/models.dart';
 import 'tabs/profile_tab.dart';
 import 'tabs/match_pool_tab.dart';
+import 'tabs/agency_tab.dart';
 
 class AppShell extends StatefulWidget {
   final MatchApi api;
@@ -60,7 +61,7 @@ class _AppShellState extends State<AppShell> {
     final List<Widget> tabs = [
       MatchPoolTab(api: widget.api, currentUser: _currentUser!),
       QnaBoxTab(api: widget.api, me: _currentUser!),
-      const Center(child: Text('봉사기관')),
+      AgencyTab(api: widget.api, currentUser: _currentUser!),
       ProfileTab(me: _currentUser!),
     ];
 

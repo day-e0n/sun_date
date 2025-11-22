@@ -40,6 +40,7 @@ dependencies:
   file_picker: ^8.0.3
   go_router: ^14.1.0
   intl: ^0.19.0
+  csv: ^6.0.0 # 이 줄 추가 (버전은 최신 버전 확인)
 
 dev_dependencies:
   flutter_test:
@@ -63,6 +64,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/volunteers.csv
 
   # To add assets to your application, add an assets section, like this:
   # assets:
