@@ -37,7 +37,7 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
 
   // 선택된 사용자 및 카테고리 추적
   String? _selectedUserId;
-  VolunteerCategory? _selectedCategory; // null이면 '전체'
+  VolunteerCategory _selectedCategory = VolunteerCategory.animal; // '전체'를 없애고 기본값 설정
 
   // 카테고리 라벨 헬퍼
   static String _categoryLabel(VolunteerCategory c) {
@@ -84,7 +84,7 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
     });
   }
 
-  void _onCategorySelected(VolunteerCategory? category) {
+  void _onCategorySelected(VolunteerCategory category) {
     setState(() {
       _selectedCategory = category;
       _selectedUserId = null; // 필터 변경 시 카드 선택 해제
@@ -94,9 +94,7 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
   @override
   Widget build(BuildContext context) {
     // 선택된 카테고리에 따라 사용자 목록 필터링
-    final filteredUsers = _selectedCategory == null
-        ? _dummyUsers
-        : _dummyUsers.where((user) => user.preferredCategories.contains(_selectedCategory)).toList();
+    final filteredUsers = _dummyUsers.where((user) => user.preferredCategories.contains(_selectedCategory)).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -110,22 +108,17 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Wrap(
               spacing: 8,
-              children: [
-                // '전체' 칩
-                ChoiceChip(
-                  label: const Text('전체'),
-                  selected: _selectedCategory == null,
-                  onSelected: (selected) => _onCategorySelected(null),
-                ),
-                // 나머지 카테고리 칩
-                ...VolunteerCategory.values.map((category) {
-                  return ChoiceChip(
-                    label: Text(_categoryLabel(category)),
-                    selected: _selectedCategory == category,
-                    onSelected: (selected) => _onCategorySelected(category),
-                  );
-                }).toList(),
-              ],
+              children: VolunteerCategory.values.map((category) {
+                return ChoiceChip(
+                  label: Text(_categoryLabel(category)),
+                  selected: _selectedCategory == category,
+                  onSelected: (selected) {
+                    if (selected) {
+                      _onCategorySelected(category);
+                    }
+                  },
+                );
+              }).toList(),
             ),
           ),
           const Divider(height: 1),
@@ -133,79 +126,79 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
           Expanded(
             child: filteredUsers.isEmpty
                 ? const Center(
-                    child: Text('해당 카테고리에 맞는 상대가 없습니다.')
-                  )
+              child: Text('해당 카테고리에 맞는 상대가 없습니다.'),
+            )
                 : ListView.builder(
-                    padding: const EdgeInsets.all(8),
-                    itemCount: filteredUsers.length,
-                    itemBuilder: (context, index) {
-                      final user = filteredUsers[index];
-                      final isSelected = _selectedUserId == user.studentId;
+              padding: const EdgeInsets.all(8),
+              itemCount: filteredUsers.length,
+              itemBuilder: (context, index) {
+                final user = filteredUsers[index];
+                final isSelected = _selectedUserId == user.studentId;
 
-                      return Card(
-                        elevation: isSelected ? 4 : 1,
-                        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          onTap: () {
-                            setState(() {
-                              if (isSelected) {
-                                _selectedUserId = null;
-                              } else {
-                                _selectedUserId = user.studentId;
-                              }
-                            });
-                          },
-                          child: AnimatedSize(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
+                return Card(
+                  elevation: isSelected ? 4 : 1,
+                  margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedUserId = null;
+                        } else {
+                          _selectedUserId = user.studentId;
+                        }
+                      });
+                    },
+                    child: AnimatedSize(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                CircleAvatar(child: Text(user.nickname.substring(0, 1))),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      CircleAvatar(child: Text(user.nickname.substring(0, 1))),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(user.nickname, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                            const SizedBox(height: 4),
-                                            Text('${user.age}세 / ${user.gender == Gender.male ? '남' : '여'} / ${user.region}'),
-                                          ],
-                                        ),
-                                      ),
+                                      Text(user.nickname, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                      const SizedBox(height: 4),
+                                      Text('${user.age}세 / ${user.gender == Gender.male ? '남' : '여'} / ${user.region}'),
                                     ],
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text('MBTI: ${user.mbti}'),
-                                  const SizedBox(height: 2),
-                                  Text('선호 봉사: ${user.preferredCategories.map(_categoryLabel).join(', ')}'),
-                                  if (isSelected)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 16.0),
-                                      child: SizedBox(
-                                        width: double.infinity,
-                                        child: FilledButton(
-                                          onPressed: () => _handleSendRequest(user),
-                                          style: FilledButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(vertical: 12),
-                                          ),
-                                          child: const Text('매칭 요청 보내기'),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          ),
+                            const SizedBox(height: 8),
+                            Text('MBTI: ${user.mbti}'),
+                            const SizedBox(height: 2),
+                            Text('선호 봉사: ${user.preferredCategories.map(_categoryLabel).join(', ')}'),
+                            if (isSelected)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 16.0),
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton(
+                                    onPressed: () => _handleSendRequest(user),
+                                    style: FilledButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                    ),
+                                    child: const Text('매칭 요청 보내기'),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                      );
-                    },
+                      ),
+                    ),
                   ),
+                );
+              },
+            ),
           ),
         ],
       ),

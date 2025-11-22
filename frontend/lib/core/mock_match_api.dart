@@ -27,12 +27,26 @@ class MockMatchApi implements MatchApi {
   // Constructor to initialize with some dummy data
   MockMatchApi() {
     // Add a few dummy users for testing
-    _addDummyUser('00000000', 'test', '테스트계정', 25, Gender.female, 'ENTP');
-    _addDummyUser('11111111', 'test', '김단국', 22, Gender.male, 'ISTP');
-    _addDummyUser('22222222', 'test', '최단웅', 23, Gender.female, 'ENFJ');
+    _addDummyUser('00000000', 'test', '김단국', 25, Gender.female, 'ENTP');
+    _addDummyUser('32221902', 'test', '박주희', 24, Gender.male, 'ISTJ');
+    _addDummyUser('32222797', 'test', '위다연', 23, Gender.female, 'ESTJ');
+
+    // Add a dummy incoming question for the master test account
+    _sentQuestions.add(SentQuestion(
+      id: 'q${++_qId}',
+      senderId: '32221902',
+      // 박주희
+      receiverId: '00000000',
+      // 김단국 (나)
+      receiverName: '김단국',
+      questions: ['주말에 주로 뭐하세요?', '취미는 무엇인가요?', '성격의 장단점을 알려주세요!'],
+      createdAt: DateTime.now().subtract(const Duration(hours: 1)),
+      status: SentQuestionStatus.pending,
+    ));
   }
 
-  void _addDummyUser(String studentId, String password, String nickname, int age, Gender gender, String mbti) {
+  void _addDummyUser(String studentId, String password, String nickname,
+      int age, Gender gender, String mbti) {
     final profile = UserProfile(
       nickname: nickname,
       studentId: studentId,
@@ -65,6 +79,7 @@ class MockMatchApi implements MatchApi {
     if (_userRecords.containsKey(studentId)) {
       throw Exception('이미 가입된 학번입니다.');
     }
+    // Re-use the dummy user creation logic
     _addDummyUser(studentId, password, nickname, age, gender, mbti);
     return _userRecords[studentId]!.profile;
   }
@@ -116,8 +131,9 @@ class MockMatchApi implements MatchApi {
     return _sentQuestions.where((q) => q.senderId == userId).toList();
   }
 
- @override
-  Future<List<SentQuestion>> listReceivedQuestions({required String userId}) async {
+  @override
+  Future<List<SentQuestion>> listReceivedQuestions(
+      {required String userId}) async {
     await Future.delayed(const Duration(milliseconds: 100));
     return _sentQuestions.where((q) => q.receiverId == userId).toList();
   }
@@ -143,7 +159,8 @@ class MockMatchApi implements MatchApi {
     await Future.delayed(const Duration(milliseconds: 200));
     final partner = _userRecords.values
         .map((r) => r.profile)
-        .firstWhere((u) => u.studentId != userId, orElse: () => throw Exception('No partners'));
+        .firstWhere((u) => u.studentId != userId,
+        orElse: () => throw Exception('No partners'));
     final matchId = 'm${++_matchSeq}';
     final session = MatchSession(
       id: matchId,
