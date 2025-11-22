@@ -30,7 +30,7 @@ class _OutgoingQnaTabState extends State<OutgoingQnaTab> {
 
   @override
   Widget build(BuildContext context) {
-    // 내가 시작한 QnA(= selfUserId == me.id) 리스트
+    // 내가 시작한 QnA(= selfUserId == me.studentId) 리스트
     return Row(
       children: [
         SizedBox(
@@ -47,7 +47,7 @@ class _OutgoingQnaTabState extends State<OutgoingQnaTab> {
               const Divider(height: 1),
               Expanded(
                 child: FutureBuilder<List<MatchSession>>(
-                  future: widget.api.listMyMatches(userId: widget.me.id),
+                  future: widget.api.listMyMatches(userId: widget.me.studentId),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
@@ -61,7 +61,7 @@ class _OutgoingQnaTabState extends State<OutgoingQnaTab> {
                     // 내가 "selfUserId" 인 세션만 내보냄 = 내가 매칭을 시작한 방
                     final allMatches = snapshot.data ?? [];
                     final matches = allMatches
-                        .where((m) => m.selfUserId == widget.me.id)
+                        .where((m) => m.selfUserId == widget.me.studentId)
                         .toList();
 
                     if (matches.isEmpty) {
@@ -99,8 +99,8 @@ class _OutgoingQnaTabState extends State<OutgoingQnaTab> {
         Expanded(
           child: _selectedMatch == null
               ? const Center(
-            child: Text('좌측에서 대화를 선택해 주세요.'),
-          )
+                  child: Text('좌측에서 대화를 선택해 주세요.'),
+                )
               : _buildRoomDetail(_selectedMatch!),
         ),
       ],
@@ -119,6 +119,8 @@ class _OutgoingQnaTabState extends State<OutgoingQnaTab> {
         const Divider(height: 1),
         Expanded(
           child: FutureBuilder<List<QnaMessage>>(
+            // key를 추가하여 setState() 호출 시 FutureBuilder가 재실행되도록 함
+            key: ValueKey(match.id),
             future: widget.api.getConversation(matchId: match.id),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
@@ -141,12 +143,11 @@ class _OutgoingQnaTabState extends State<OutgoingQnaTab> {
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
                   final m = messages[messages.length - 1 - index];
-                  // MockMatchApi에서 sender == self → selfUserId 쪽(= 여기서는 항상 나)
                   final isMe = m.sender == MessageSender.self;
 
                   return Align(
                     alignment:
-                    isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        isMe ? Alignment.centerRight : Alignment.centerLeft,
                     child: Container(
                       margin: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -155,11 +156,19 @@ class _OutgoingQnaTabState extends State<OutgoingQnaTab> {
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: isMe
-                            ? Colors.pink.withOpacity(0.1)
-                            : Colors.grey[200],
+                            ? Theme.of(context).colorScheme.primaryContainer
+                            : Theme.of(context).colorScheme.secondaryContainer,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(m.content),
+                      child: Text(m.content,
+                          style: TextStyle(
+                              color: isMe
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .onPrimaryContainer
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .onSecondaryContainer)),
                     ),
                   );
                 },
@@ -192,10 +201,11 @@ class _OutgoingQnaTabState extends State<OutgoingQnaTab> {
 
                   await widget.api.sendQuestion(
                     matchId: match.id,
-                    fromUserId: widget.me.id,
+                    fromUserId: widget.me.studentId,
                     content: text,
                   );
                   _questionCtrl.clear();
+                  // Re-fetch messages after sending
                   setState(() {});
                 },
               ),

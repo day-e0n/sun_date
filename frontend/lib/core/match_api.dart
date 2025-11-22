@@ -1,7 +1,27 @@
-// core/match_api.dart
 import 'models.dart';
 
 abstract class MatchApi {
+  // 인증
+  Future<UserProfile> signUp({
+    required String nickname,
+    required String studentId, // 이 값은 재학증명서 처리 후 백엔드에서 생성될 수 있음
+    required int age, // 이 값도 마찬가지
+    required String password, // 비밀번호 추가
+    required Gender gender,
+    required String mbti,
+    required String region,
+    required List<VolunteerCategory> preferredCategories,
+    required List<TimeSlot> preferredTimeSlots,
+    required String preferredRegion,
+    // required String proofOfEnrollment, // 재학증명서 파일 경로 또는 base64
+  });
+
+  Future<UserProfile> login({
+    required String studentId,
+    required String password,
+  });
+
+  @Deprecated('Use signUp instead')
   Future<UserProfile> createProfile({
     required String nickname,
     required String studentId,
@@ -14,18 +34,16 @@ abstract class MatchApi {
     required String preferredRegion,
   });
 
-  // 탭 1: 매칭 후보 리스트
+  // 매칭
   Future<List<UserProfile>> listCandidates({
     required String userId,
     VolunteerCategory? categoryFilter,
   });
 
-  // 탭 2/3: 내가 참여 중인 매칭 리스트
   Future<List<MatchSession>> listMyMatches({
     required String userId,
   });
 
-  // 자동 매칭 요청
   Future<MatchSession> requestMatch({required String userId});
 
   // QnA
@@ -45,14 +63,13 @@ abstract class MatchApi {
     required String matchId,
   });
 
-  // 매칭 종료
   Future<void> finishMatch({
     required String matchId,
     required String userId,
     required bool accepted,
   });
 
-  // 봉사 추천
+  // 봉사활동
   Future<VolunteerActivity> recommendVolunteer({
     required String matchId,
     required String userId,

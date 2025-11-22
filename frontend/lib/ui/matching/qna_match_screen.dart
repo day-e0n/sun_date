@@ -42,7 +42,7 @@ class _QnaMatchScreenState extends State<QnaMatchScreen> {
     if (widget.currentUser == null || _session != null) return;
     setState(() => _loading = true);
     try {
-      final s = await widget.api.requestMatch(userId: widget.currentUser!.id);
+      final s = await widget.api.requestMatch(userId: widget.currentUser!.studentId);
       _session = s;
       widget.onMatchCreated?.call(s);
       await _refreshMessages();
@@ -84,7 +84,7 @@ class _QnaMatchScreenState extends State<QnaMatchScreen> {
       for (final answer in answers) {
         await widget.api.sendAnswer(
           matchId: _session!.id,
-          fromUserId: widget.currentUser!.id,
+          fromUserId: widget.currentUser!.studentId,
           content: answer,
         );
       }
@@ -95,6 +95,7 @@ class _QnaMatchScreenState extends State<QnaMatchScreen> {
       );
       // 매칭 수락/종료 화면으로 이동하거나, 홈으로 복귀 등의 로직 추가 가능
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('답변 전송 실패: $e')),
       );

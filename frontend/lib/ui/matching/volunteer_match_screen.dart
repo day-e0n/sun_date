@@ -1,4 +1,7 @@
+// lib/ui/matching/volunteer_match_screen.dart
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
 import '../../core/match_api.dart';
 import '../../core/models.dart';
 
@@ -10,8 +13,8 @@ class VolunteerMatchScreen extends StatefulWidget {
   const VolunteerMatchScreen({
     super.key,
     required this.api,
-    required this.currentUser,
-    required this.currentMatch,
+    this.currentUser,
+    this.currentMatch,
   });
 
   @override
@@ -19,87 +22,111 @@ class VolunteerMatchScreen extends StatefulWidget {
 }
 
 class _VolunteerMatchScreenState extends State<VolunteerMatchScreen> {
-  VolunteerActivity? _activity;
-  bool _loading = false;
+  Future<VolunteerActivity>? _activityFuture;
 
-  Future<void> _load() async {
-    if (widget.currentUser == null || widget.currentMatch == null) return;
-    setState(() => _loading = true);
-    try {
-      final act = await widget.api.recommendVolunteer(
-        matchId: widget.currentMatch!.id,
-        userId: widget.currentUser!.id,
-      );
-      if (mounted) setState(() => _activity = act);
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+  @override
+  void initState() {
+    super.initState();
+    _load();
   }
 
-  Future<void> _finish(bool ok) async {
-    if (widget.currentMatch == null || widget.currentUser == null) return;
-    await widget.api.finishMatch(
-      matchId: widget.currentMatch!.id,
-      userId: widget.currentUser!.id,
-      accepted: ok,
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(ok ? '봉사 신청 완료(가상).' : '봉사 신청을 취소했습니다.')),
-    );
+  void _load() {
+    if (widget.currentUser == null || widget.currentMatch == null) return;
+    setState(() {
+      _activityFuture = widget.api.recommendVolunteer(
+        matchId: widget.currentMatch!.id,
+        userId: widget.currentUser!.studentId, // id -> studentId
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.currentUser == null || widget.currentMatch == null) {
-      return const Center(child: Text('QnA 매칭을 먼저 완료해 주세요.'));
+    if (widget.currentUser == null) {
+      return const Center(child: Text('로그인이 필요합니다.'));
+    }
+    if (widget.currentMatch == null) {
+      return const Center(child: Text('진행 중인 매칭이 없습니다.'));
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('봉사 매칭')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: _activity == null
-            ? Center(
-          child: _loading
-              ? const CircularProgressIndicator()
-              : FilledButton(
-            onPressed: _load,
-            child: const Text('봉사 추천 받기'),
-          ),
-        )
-            : Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(_activity!.title,
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text(_activity!.description),
-            const SizedBox(height: 8),
-            Text('장소: ${_activity!.location}'),
-            Text('날짜/시간: ${_activity!.dateTime}'),
-            const Spacer(),
-            Row(
+      appBar: AppBar(
+        title: const Text('봉사 활동 추천'),
+      ),
+      body: FutureBuilder<VolunteerActivity>(
+        future: _activityFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('봉사 활동을 불러오는 중 오류: ${snapshot.error}'));
+          }
+          final activity = snapshot.data;
+          if (activity == null) {
+            return const Center(child: Text('추천된 봉사 활동이 없습니다.'));
+          }
+
+          final formattedDate = DateFormat('yyyy년 MM월 dd일 HH:mm').format(activity.dateTime);
+
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => _finish(false),
-                    child: const Text('Cancel'),
-                  ),
+                Text(
+                  activity.title,
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => _finish(true),
-                    child: const Text('OK'),
+                const SizedBox(height: 16),
+                _buildInfoRow(Icons.calendar_today, formattedDate),
+                const SizedBox(height: 8),
+                _buildInfoRow(Icons.location_on, activity.location),
+                const SizedBox(height: 8),
+                _buildInfoRow(Icons.category, _categoryLabel(activity.category)),
+                const Divider(height: 32),
+                Text(activity.description),
+                const Spacer(),
+                FilledButton.icon(
+                  onPressed: () {
+                    // TODO: 채팅방 또는 외부 링크로 연결
+                  },
+                  icon: const Icon(Icons.arrow_forward),
+                  label: const Text('파트너와 함께 봉사하러 가기'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
                   ),
-                ),
+                )
               ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey[600]),
+        const SizedBox(width: 8),
+        Text(text),
+      ],
+    );
+  }
+
+  static String _categoryLabel(VolunteerCategory c) {
+    switch (c) {
+      case VolunteerCategory.animal:
+        return '동물 돌봄';
+      case VolunteerCategory.nursingHome:
+        return '이웃 돌봄';
+      case VolunteerCategory.environment:
+        return '환경보호';
+      case VolunteerCategory.education:
+        return '교육·멘토링';
+      default:
+        return '기타';
+    }
   }
 }

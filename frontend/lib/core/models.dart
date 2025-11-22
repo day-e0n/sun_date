@@ -1,11 +1,12 @@
-enum Gender { male, female}
+import 'dart:convert';
 
-enum VolunteerCategory { animal, nursingHome, environment, education, other}
+enum Gender { male, female }
+
+enum VolunteerCategory { animal, nursingHome, environment, education, other }
 
 enum TimeSlot { morning, afternoon, evening }
 
 class UserProfile {
-  final String id;
   final String nickname;
   final String studentId;
   final int age;
@@ -17,7 +18,6 @@ class UserProfile {
   final String preferredRegion;
 
   UserProfile({
-    required this.id,
     required this.nickname,
     required this.studentId,
     required this.age,
@@ -28,6 +28,34 @@ class UserProfile {
     required this.preferredTimeSlots,
     required this.preferredRegion,
   });
+
+  Map<String, dynamic> toJson() => {
+        'nickname': nickname,
+        'studentId': studentId,
+        'age': age,
+        'gender': gender.name,
+        'mbti': mbti,
+        'region': region,
+        'preferredCategories': preferredCategories.map((e) => e.name).toList(),
+        'preferredTimeSlots': preferredTimeSlots.map((e) => e.name).toList(),
+        'preferredRegion': preferredRegion,
+      };
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
+        nickname: json['nickname'],
+        studentId: json['studentId'],
+        age: json['age'],
+        gender: Gender.values.byName(json['gender']),
+        mbti: json['mbti'],
+        region: json['region'],
+        preferredCategories: (json['preferredCategories'] as List)
+            .map((e) => VolunteerCategory.values.byName(e))
+            .toList(),
+        preferredTimeSlots: (json['preferredTimeSlots'] as List)
+            .map((e) => TimeSlot.values.byName(e))
+            .toList(),
+        preferredRegion: json['preferredRegion'],
+      );
 }
 
 class MatchSession {

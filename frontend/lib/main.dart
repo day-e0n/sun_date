@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sundate/core/router.dart';
 import 'core/mock_match_api.dart';
-import 'ui/app_shell.dart';
 
 void main() {
   final api = MockMatchApi();
-  runApp(SunDateApp(api: api));
+  final router = createRouter(api);
+
+  runApp(SunDateApp(router: router));
 }
 
 class SunDateApp extends StatelessWidget {
-  final MockMatchApi api;
+  final GoRouter router;
 
-  const SunDateApp({super.key, required this.api});
+  const SunDateApp({super.key, required this.router});
 
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: '선데이트',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.pinkAccent),
@@ -25,7 +28,7 @@ class SunDateApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: AppShell(api: api),
+      routerConfig: router,
     );
   }
 }
