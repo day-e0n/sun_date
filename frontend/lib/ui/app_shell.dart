@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'tabs/qna_box_tab.dart';
-import '../core/match_api.dart';
-import '../core/models.dart';
-import 'tabs/profile_tab.dart';
-import 'tabs/match_pool_tab.dart';
+import 'package:sundate/ui/tabs/qna_box_tab.dart';
+import 'package:sundate/core/match_api.dart';
+import 'package:sundate/core/models.dart';
+import 'package:sundate/ui/tabs/profile_tab.dart';
+import 'package:sundate/ui/tabs/match_pool_tab.dart';
 import 'tabs/agency_tab.dart';
 
 class AppShell extends StatefulWidget {
@@ -61,7 +61,7 @@ class _AppShellState extends State<AppShell> {
     final List<Widget> tabs = [
       MatchPoolTab(api: widget.api, currentUser: _currentUser!),
       QnaBoxTab(api: widget.api, me: _currentUser!),
-      AgencyTab(api: widget.api, currentUser: _currentUser!),
+      const Center(child: Text('봉사기관')),
       ProfileTab(me: _currentUser!),
     ];
 

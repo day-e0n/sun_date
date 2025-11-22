@@ -27,17 +27,16 @@ class MockMatchApi implements MatchApi {
   // Constructor to initialize with some dummy data
   MockMatchApi() {
     // Add a few dummy users for testing
-    _addDummyUser('00000000', 'test', '김단국', 25, Gender.female, 'ENTP');
-    _addDummyUser('32221902', 'test', '박주희', 24, Gender.male, 'ISTJ');
-    _addDummyUser('32222797', 'test', '위다연', 23, Gender.female, 'ESTJ');
+    _addDummyUser('00000000', 'test', '김단국', 25, 'female', 'ENTP', '서울', '동물');
+    _addDummyUser('32221902', 'test', '박주희', 24, 'male', 'ISTJ', '경기', '교육');
+    _addDummyUser('32222797', 'test', '위다연', 23, 'female', 'ESTJ', '인천', '환경');
 
     // Add a dummy incoming question for the master test account
     _sentQuestions.add(SentQuestion(
       id: 'q${++_qId}',
       senderId: '32221902',
-      // 박주희
+      senderName: '박주희',
       receiverId: '00000000',
-      // 김단국 (나)
       receiverName: '김단국',
       questions: ['주말에 주로 뭐하세요?', '취미는 무엇인가요?', '성격의 장단점을 알려주세요!'],
       createdAt: DateTime.now().subtract(const Duration(hours: 1)),
@@ -46,19 +45,18 @@ class MockMatchApi implements MatchApi {
   }
 
   void _addDummyUser(String studentId, String password, String nickname,
-      int age, Gender gender, String mbti) {
+      int age, String sex, String mbti, String location, String volunteerField) {
     final profile = UserProfile(
       nickname: nickname,
       studentId: studentId,
       age: age,
-      gender: gender,
+      sex: sex,
       mbti: mbti,
-      region: '서울',
-      preferredCategories: [VolunteerCategory.animal],
+      location: location,
+      volunteerField: volunteerField,
     );
     _userRecords[studentId] = _UserRecord(profile: profile, password: password);
   }
-
 
   @override
   Future<UserProfile> signUp({
@@ -66,20 +64,28 @@ class MockMatchApi implements MatchApi {
     required String studentId,
     required int age,
     required String password,
-    required Gender gender,
+    required String sex, // Changed from Gender
     required String mbti,
-    required String region,
-    required List<VolunteerCategory> preferredCategories,
-    required List<TimeSlot> preferredTimeSlots,
-    required String preferredRegion,
+    required String location, // Changed from region
+    String? volunteerField, // Changed from List<VolunteerCategory>
+    List<TimeSlot>? preferredTimeSlots, 
+    String? preferredRegion, 
   }) async {
     await Future.delayed(const Duration(milliseconds: 200));
     if (_userRecords.containsKey(studentId)) {
       throw Exception('이미 가입된 학번입니다.');
     }
-    // Re-use the dummy user creation logic
-    _addDummyUser(studentId, password, nickname, age, gender, mbti);
-    return _userRecords[studentId]!.profile;
+    final profile = UserProfile(
+      nickname: nickname,
+      studentId: studentId,
+      age: age,
+      sex: sex,
+      mbti: mbti,
+      location: location,
+      volunteerField: volunteerField,
+    );
+    _userRecords[studentId] = _UserRecord(profile: profile, password: password);
+    return profile;
   }
 
   @override
@@ -92,6 +98,12 @@ class MockMatchApi implements MatchApi {
       throw Exception('사용자를 찾을 수 없거나 비밀번호가 틀렸습니다.');
     }
     return record.profile;
+  }
+
+  @override
+  Future<UserProfile?> getUserProfile(String userId) async {
+    await Future.delayed(const Duration(milliseconds: 50));
+    return _userRecords[userId]?.profile;
   }
 
   @override
@@ -111,9 +123,15 @@ class MockMatchApi implements MatchApi {
     required List<String> questions,
   }) async {
     await Future.delayed(const Duration(milliseconds: 300));
+    final senderProfile = _userRecords[fromUserId]?.profile;
+    if (senderProfile == null) {
+      throw Exception('Sender not found');
+    }
+
     final newQuestion = SentQuestion(
       id: 'q${++_qId}',
       senderId: fromUserId,
+      senderName: senderProfile.nickname,
       receiverId: toUser.studentId,
       receiverName: toUser.nickname,
       questions: questions,
@@ -235,11 +253,11 @@ class MockMatchApi implements MatchApi {
       category: '기타',
       title: '모의 봉사 활동',
       agencyName: '모의 기관',
-      dateAndTime: '2025년 12월 1일, 오후 2:00', // dateAndTime으로 통합
-      days: '월·수',                          // 필수 필드 추가
+      dateAndTime: '2025년 12월 1일, 오후 2:00',
+      days: '월·수',
       location: '서울 어딘가',
       description: '테스트용 데이터',
-      requirements: ['테스트 요구사항'],       // List<String>
+      requirements: ['테스트 요구사항'],
     );
 
     _activityByMatch[matchId] = activity;

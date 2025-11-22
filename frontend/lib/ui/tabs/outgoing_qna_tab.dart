@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import '../../core/match_api.dart';
-import '../../core/models.dart';
+import 'package:sundate/core/match_api.dart'; // 수정
+import 'package:sundate/core/models.dart'; // 수정
 
 class OutgoingQnaTab extends StatelessWidget {
   final MatchApi api;
@@ -11,6 +12,8 @@ class OutgoingQnaTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return FutureBuilder<List<SentQuestion>>(
       future: api.listSentQuestions(userId: me.studentId),
       builder: (context, snapshot) {
@@ -26,38 +29,42 @@ class OutgoingQnaTab extends StatelessWidget {
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           itemCount: questions.length,
           itemBuilder: (context, index) {
             final item = questions[index];
-            final formattedDate = DateFormat('yyyy-MM-dd HH:mm').format(item.createdAt);
+            final formattedDate = DateFormat('MM/dd HH:mm').format(item.createdAt);
 
             return Card(
-              margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+              clipBehavior: Clip.antiAlias,
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                onTap: () {
+                  // extra를 Map 형태로 전달하도록 수정
+                  context.go('/qna/${item.id}', extra: {'question': item, 'me': me});
+                },
+                leading: const CircleAvatar(
+                  child: Icon(Icons.person_outline_rounded),
+                ),
+                title: Text(
+                  '${item.receiverName}님에게 보낸 질문',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  '상태: ${item.status.name}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('To: ${item.receiverName}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    const Divider(height: 16),
-                    ...item.questions.asMap().entries.map((e) {
-                      return Text('${e.key + 1}. ${e.value}');
-                    }),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '상태: ${item.status.name}',
-                          style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          '보낸 시각: $formattedDate',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    )
+                    Text(formattedDate, style: theme.textTheme.bodySmall),
+                    const SizedBox(height: 4),
+                    const Icon(Icons.arrow_forward_ios, size: 14),
                   ],
                 ),
               ),

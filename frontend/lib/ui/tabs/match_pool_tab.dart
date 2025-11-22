@@ -25,13 +25,18 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
   @override
   void initState() {
     super.initState();
-    _loadToken();
+    _loadTokenAndFetchUsers();
+  }
+
+  Future<void> _loadTokenAndFetchUsers() async {
+    await _loadToken();
     _fetchUsersByCategory(_selectedCategory);
   }
 
+
   Future<void> _loadToken() async {
     final prefs = await SharedPreferences.getInstance();
-    _authToken = prefs.getString("auth_token");
+    _authToken = prefs.getString("token");
   }
 
   // Convert VolunteerCategory → 서버에서 기대하는 volunteer_field 문자열
@@ -40,11 +45,11 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
       case VolunteerCategory.animal:
         return "동물";
       case VolunteerCategory.education:
-        return "교육·멘토링";
+        return "교육";
       case VolunteerCategory.environment:
-        return "환경보호";
+        return "환경";
       case VolunteerCategory.nursingHome:
-        return "이웃 돌봄";
+        return "시설";
       default:
         return "기타";
     }
@@ -52,44 +57,55 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
 
   // 서버에서 사용자 목록 불러오기
   Future<void> _fetchUsersByCategory(VolunteerCategory category) async {
-    if (_authToken == null) return;
+    if (_authToken == null) {
+      await _loadToken();
+      if(_authToken == null) {
+        print("Auth token is not available.");
+        return;
+      }
+    }
 
     setState(() => _loading = true);
 
     final url = Uri.parse("http://220.149.241.209:8000/api/volunteer-search/");
-    final resp = await http.post(
-      url,
-      headers: {
-        "Authorization": "Token $_authToken",
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({
-        "volunteer_field": _categoryToServerString(category),
-      }),
-    );
+    try {
+      final resp = await http.post(
+        url,
+        headers: {
+          "Authorization": "Token $_authToken",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "volunteer_field": _categoryToServerString(category),
+        }),
+      );
 
-    if (resp.statusCode != 200) {
-      print("검색 실패: ${resp.body}");
-      setState(() => _loading = false);
-      return;
+      if (resp.statusCode != 200) {
+        print("검색 실패: ${resp.body}");
+        setState(() => _loading = false);
+        return;
+      }
+
+      final List<dynamic> data = jsonDecode(utf8.decode(resp.bodyBytes));
+
+      setState(() {
+        _users = data.map((e) {
+          return UserProfile(
+            studentId: e["student_id"] ?? "", // API 응답에 student_id가 없어 임시 처리
+            nickname: e["nickname"] ?? "",
+            age: e["age"] ?? 0,
+            sex: e["sex"] ?? "unknown",
+            mbti: e["mbti"] ?? "",
+            location: e["location"] ?? "",
+            volunteerField: e["volunteer_field"],
+          );
+        }).toList();
+        _loading = false;
+      });
+    } catch (e) {
+        print("An error occurred: $e");
+        setState(() => _loading = false);
     }
-
-    final List<dynamic> data = jsonDecode(resp.body);
-
-    setState(() {
-      _users = data.map((e) {
-        return UserProfile(
-          studentId: "",
-          nickname: e["nickname"] ?? "",
-          age: e["age"] ?? 0,
-          gender: (e["sex"] == "male") ? Gender.male : Gender.female,
-          mbti: e["mbti"] ?? "",
-          region: e["location"] ?? "",
-          preferredCategories: [category],
-        );
-      }).toList();
-      _loading = false;
-    });
   }
 
   // 매칭 요청 보내기 (이전 로직 사용)
@@ -105,6 +121,15 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
         const SnackBar(content: Text('프로필 탭에서 고정 질문을 먼저 설정해주세요.')),
       );
       return;
+    }
+
+    // MatchApi의 sendMatchRequest는 아직 UserProfile의 예전 모델을 사용하고 있을 수 있음.
+    // 우선 UI단에서 toUser의 studentId가 없다는 것을 인지해야 함.
+    if (toUser.studentId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('요청을 보낼 사용자의 학번 정보가 없습니다.')),
+        );
+        return;
     }
 
     await widget.api.sendMatchRequest(
@@ -125,13 +150,13 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
   static String _categoryLabel(VolunteerCategory c) {
     switch (c) {
       case VolunteerCategory.animal:
-        return '동물 돌봄';
+        return '동물';
       case VolunteerCategory.nursingHome:
-        return '이웃 돌봄';
+        return '시설';
       case VolunteerCategory.environment:
-        return '환경보호';
+        return '환경';
       case VolunteerCategory.education:
-        return '교육·멘토링';
+        return '교육';
       default:
         return '기타';
     }
@@ -192,7 +217,7 @@ class _MatchPoolTabState extends State<MatchPoolTab> {
                           Text(user.nickname,
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold)),
-                          Text('${user.age}세 / ${user.region}'),
+                          Text('${user.age}세 / ${user.location}'),
                           Text('MBTI: ${user.mbti}'),
                           if (isSelected)
                             FilledButton(

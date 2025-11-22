@@ -1,4 +1,4 @@
-import 'models.dart';
+import 'package:sundate/core/models.dart';
 
 abstract class MatchApi {
   // 인증
@@ -20,6 +20,8 @@ abstract class MatchApi {
     required String password,
   });
 
+  Future<UserProfile?> getUserProfile(String userId);
+
   // 매칭 및 질문
   Future<List<UserProfile>> listCandidates({
     required String userId,
@@ -33,6 +35,14 @@ abstract class MatchApi {
   });
 
   Future<List<SentQuestion>> listSentQuestions({required String userId});
+
+  Future<List<SentQuestion>> listReceivedQuestions({required String userId});
+
+  Future<void> submitAnswer({
+    required String questionId,
+    required List<String> answers,
+  });
+
 
   // 기존 QnA (향후 위 구조와 통합하거나 재설계 필요)
   @Deprecated('Use sendMatchRequest instead')

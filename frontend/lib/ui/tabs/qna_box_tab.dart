@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-
-import '../../core/match_api.dart';
-import '../../core/models.dart';
-import 'incoming_qna_tab.dart';
-import 'outgoing_qna_tab.dart';
+import 'package:sundate/core/match_api.dart';
+import 'package:sundate/core/models.dart';
+import 'package:sundate/ui/tabs/incoming_qna_tab.dart';
+import 'package:sundate/ui/tabs/outgoing_qna_tab.dart';
 
 class QnaBoxTab extends StatefulWidget {
   final MatchApi api;

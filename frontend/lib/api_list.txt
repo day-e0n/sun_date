@@ -1,0 +1,104 @@
+회원가입:
+
+curl -X POST http://220.149.241.209:8000/api/signup/ \
+	-H "Content-Type: application/json" \
+	-d '{"student_id": "학번", "password": "testpassword123"}'
+
+response:
+
+{"token":"cc0a079b0583718279415f6a8faad0371c958b66"}
+# 이 토큰으로 이후 통신 해야함
+```
+(가능하면 flutter에서 pw 2번 확인하는 절차 추가해주세요)
+
+--------------------------------------------------------------------
+로그인:
+
+curl -X POST http://220.149.241.209:8000/api/login/ \
+	-H "Content-Type: application/json" \
+	-d '{"student_id": "학번", "password": "testpassword123"}'
+
+response:
+{"token":"cc0a079b0583718279415f6a8faad0371c958b66"}
+
+
+--------------------------------------------------------------------
+정보 수정 (현재 가능한 건 닉네임, 나이, 성별, MBTI, 지역, 봉사 카테고리, 질문)
+
+curl -X PUT http://220.149.241.209:8000/api/user-profile/ \
+	-H "Authorization: Token received_token" \
+	-H "Content-Type: application/json" \
+	-d '{"nickname": "아아까마귀11", "age": 30, "sex": "male", "mbti": "INTJ", "location": "Testville", "question1": "What is your quest?", "question2": "What is your favorite color?", "question3": "What is the capital of Assyria?", "volunteer_field":"동물", "self_answer1":"self answer 1", "self_answer2":"self answer 2", "self_answer3":"self answer 3"}'
+
+# 위 -d 필드를 전부 채울 필요는 없음. 수정할 부분만 확인하면 됨.
+# student_id는 수정 불가능
+
+--------------------------------------------------------------------
+pdf 보내기? (진행중)
+
+curl -X POST http://220.149.241.209:8000/api/verify-document/ \
+	-H "Authorization: Token <YOUR_AUTHENTICATION_TOKEN_HERE>" \
+	-F "document=@/path/to/your/document.pdf"
+
+Response:
+	성공시:
+	{"status":"success","message":"Verification successful.","resident_reg_no_verified":true,"sex_verified":true,"student_id_admission_year_verified":true,"discrepancies":[]}
+	실패시:
+	{"status":"failed","message":"Verification failed with discrepancies.","resident_reg_no_verified":true,"sex_verified":false,"student_id_admission_year_verified":true,"discrepancies":["Sex from document does not match user's registered sex."]}%
+resident_reg_no_verified: 주민등록번호 추출 성공여부
+sex_verified: 주민등록번호 뒤의 첫자리를 비교해서 성별 확인
+student_id_admission_year_verified: 학번과 입학일자 비교
+
+--------------------------------------------------------------------
+자신의 데이터 가져오기
+
+curl -X GET http://220.149.241.209:8000/api/user-profile/ \
+	-H "Authorization: Token your_authentication_token_here"
+
+
+response:
+
+{"student_id":"32203349","nickname":"아아까마귀11","age":30,"sex":"male","mbti":"INTJ","location":"Testville","question1":"What is your quest?","question2":"What is your favorite color?","question3":"What is the capital of Assyria?","self_answer1":"self answer 1","self_answer2":"self answer 2","self_answer3":"self answer 3","volunteer_field":"동물"}
+
+--------------------------------------------------------------------
+특정 자원 봉사 카테고리를 가진 자원 봉사자 검색
+
+curl -X POST http://220.149.241.209:8000/api/volunteer-search/ \
+	-H "Authorization: Token <token_a>" \
+	-H "Content-Type: application/json" \
+	-d '{"volunteer_field": "동물"}'
+
+
+response:
+[{"nickname":"","age":30,"sex":"male","mbti":"INTJ","location":"Testville","volunteer_field":"동물"}, {"nickname":"","age":30,"sex":"male","mbti":"INTJ","location":"Testville","volunteer_field":"동물"}]
+```
+
+--------------------------------------------------------------------
+닉네임으로 질문 3가지 들고오기
+
+curl -X GET http://220.149.241.209:8000/api/users/{대상 자원 봉사자 nickname}/questions/ \
+	-H "Authorization: Token <any_valid_token_here>"
+
+response:
+{"question1":"What is your quest?","self_answer1":"self answer 1","question2":"What is your favorite color?","self_answer2":"self answer 2","question3":"What is the capital of Assyria?","self_answer3":"self answer 3"}
+```
+
+response 그대로 날리면 되나 ?
+
+--------------------------------------------------------------------
+매칭 관련 질문에 응답하기
+
+curl -X POST http://220.149.241.209:8000/api/answer-question/ \
+	-H "Authorization: Token <token_A2>" \
+	-H "Content-Type: application/json" \
+	-d '[ {"question_owner_nickname": "아아까마귀11", "question_number": 1, "answer_text": "My spirit animal is a wolf."}, {"question_owner_nickname": "아아까마귀11", "question_number": 2, "answer_text": "My favorite food is pizza."}, {"question_owner_nickname": "아아까마귀11", "question_number": 3, "answer_text": "아아아아"}]'
+
+
+매칭 관련 답변 확인하기
+curl -X GET http://220.149.241.209:8000/api/my-answers/ \
+	-H "Authorization: Token <token_Q>"
+
+response:
+	응답이 없을때: []
+	두명 이상이 응답한 경우:
+	[{"id":1,"answerer_nickname":"아아아","question_number":1,"answer_text":"My spirit animal is a wolf.","timestamp":"2025-11-22T06:32:42.827668Z"},{"id":2,"answerer_nickname":"아아아","question_number":2,"answer_text":"My favorite food is pizza.","timestamp":"2025-11-22T06:32:42.841808Z"},{"id":3,"answerer_nickname":"아아아","question_number":3,"answer_text":"아아아아","timestamp":"2025-11-22T06:32:42.853351Z"},{"id":4,"answerer_nickname":"","question_number":1,"answer_text":"My spirit animal is a wolf.","timestamp":"2025-11-22T06:33:30.703383Z"},{"id":5,"answerer_nickname":"","question_number":2,"answer_text":"My favorite food is pizza.","timestamp":"2025-11-22T06:33:30.713984Z"},{"id":6,"answerer_nickname":"","question_number":3,"answer_text":"아아아아","timestamp":"2025-11-22T06:33:30.719144Z"}]

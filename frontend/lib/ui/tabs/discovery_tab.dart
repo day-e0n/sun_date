@@ -48,7 +48,7 @@ class _DiscoveryTabState extends State<DiscoveryTab> {
                         child: Text(user.nickname.substring(0, 1)),
                       ),
                       title: Text(user.nickname),
-                      subtitle: Text('${user.mbti} · ${user.region}'),
+                      subtitle: Text('${user.mbti} · ${user.location}'),
                       onTap: () async {
                         // 1:1 QnA 매칭 생성
                         final session = await widget.api.requestMatch(
