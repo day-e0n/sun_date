@@ -61,7 +61,7 @@ class _AppShellState extends State<AppShell> {
     final List<Widget> tabs = [
       MatchPoolTab(api: widget.api, currentUser: _currentUser!),
       QnaBoxTab(api: widget.api, me: _currentUser!),
-      const Center(child: Text('봉사기관')),
+      AgencyTab(api: widget.api, currentUser: _currentUser!),
       ProfileTab(me: _currentUser!),
     ];
 
