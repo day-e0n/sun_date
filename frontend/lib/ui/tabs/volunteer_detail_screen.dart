@@ -1,17 +1,56 @@
 import 'package:flutter/material.dart';
 import '../../core/models.dart';
+import '../../core/match_api.dart'; // API 사용을 위해 추가
 
-class VolunteerDetailScreen extends StatelessWidget {
-  final VolunteerActivity activity;
-  final UserProfile currentUser;
-  final VoidCallback onAccept;
+class VolunteerDetailScreen extends StatefulWidget {
+  final VolunteerActivity activity;final UserProfile currentUser;
+  final MatchApi api; // 매칭된 유저 목록을 불러오기 위해 API 필요
+  final Function(UserProfile partner) onAccept; // 선택된 파트너를 부모에게 전달
 
   const VolunteerDetailScreen({
     super.key,
     required this.activity,
     required this.currentUser,
+    required this.api,
     required this.onAccept,
   });
+
+  @override
+  State<VolunteerDetailScreen> createState() => _VolunteerDetailScreenState();
+}
+
+class _VolunteerDetailScreenState extends State<VolunteerDetailScreen> {
+  List<UserProfile> _matchedPartners = [];
+  bool _isLoadingPartners = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMatchedPartners();
+  }
+
+  // [핵심 로직] 이전에 QnA로 서로 수락한(매칭된) 상대방 목록 불러오기
+  Future<void> _loadMatchedPartners() async {
+    setState(() => _isLoadingPartners = true);
+
+    try {
+      // 실제로는 API에 'listMatchedUsers' 같은 메서드가 있어야 합니다.
+      // 현재 MockMatchApi 구조상 listCandidates를 재활용하여 시뮬레이션합니다.
+      // (실제 구현 시: widget.api.getMatchedUsers() 등으로 교체 필요)
+      final candidates = await widget.api.listCandidates(userId: widget.currentUser.studentId);
+
+      if (mounted) {
+        setState(() {
+          // 예시를 위해 상위 3명을 매칭된 상대로 가정합니다.
+          _matchedPartners = candidates.take(3).toList();
+          _isLoadingPartners = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('파트너 로드 실패: $e');
+      if (mounted) setState(() => _isLoadingPartners = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,35 +62,21 @@ class VolunteerDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              activity.title,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2C3E50),
-              ),
+              widget.activity.title,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50)),
             ),
             const SizedBox(height: 8),
             Text(
-              activity.agencyName,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.blue,
-                fontWeight: FontWeight.w600,
-              ),
+              widget.activity.agencyName,
+              style: const TextStyle(fontSize: 16, color: Colors.blue, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 24),
-
-            // [수정] CSV 데이터 필드에 맞춰 정보 표시 변경
-            _buildInfoRow(Icons.calendar_today_outlined, activity.date), // 날짜
-            _buildInfoRow(Icons.access_time, activity.time),             // 시간
-            _buildInfoRow(Icons.calendar_month, activity.days),          // [추가] 활동 요일
-            _buildInfoRow(Icons.location_on_outlined, activity.location),// 장소
-
-            // currentParticipants는 CSV에 없으므로 제거하거나 임시로 숨김
+            _buildInfoRow(Icons.calendar_today_outlined, widget.activity.date),
+            _buildInfoRow(Icons.access_time, widget.activity.time),
+            _buildInfoRow(Icons.calendar_month, widget.activity.days),
+            _buildInfoRow(Icons.location_on_outlined, widget.activity.location),
 
             const SizedBox(height: 30),
-
-            // 활동 내용 박스
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -64,38 +89,22 @@ class VolunteerDetailScreen extends StatelessWidget {
                 children: [
                   const Text(
                     '활동 내용',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Color(0xFF2C3E50),
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2C3E50)),
                   ),
                   const SizedBox(height: 10),
-                  Text(
-                    activity.description,
-                    style: const TextStyle(
-                      height: 1.5,
-                      color: Color(0xFF7986CB),
-                    ),
-                  ),
+                  Text(widget.activity.description, style: const TextStyle(height: 1.5, color: Color(0xFF7986CB))),
                 ],
               ),
             ),
 
             const SizedBox(height: 30),
-
-            // 요구사항
             const Text(
               '요구사항',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2C3E50),
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50)),
             ),
             const SizedBox(height: 12),
-            if (activity.requirements.isNotEmpty)
-              ...activity.requirements.map((req) => Padding(
+            if (widget.activity.requirements.isNotEmpty)
+              ...widget.activity.requirements.map((req) => Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,20 +117,14 @@ class VolunteerDetailScreen extends StatelessWidget {
                     Expanded(
                       child: Text(
                         req,
-                        style: TextStyle(
-                          color: Colors.blue.shade200,
-                          fontSize: 15,
-                        ),
+                        style: TextStyle(color: Colors.blue.shade200, fontSize: 15),
                       ),
                     ),
                   ],
                 ),
               ))
             else
-              Text(
-                '별도 요구사항 없음',
-                style: TextStyle(color: Colors.grey.shade500),
-              ),
+              Text('별도 요구사항 없음', style: TextStyle(color: Colors.grey.shade500)),
           ],
         ),
       ),
@@ -137,18 +140,21 @@ class VolunteerDetailScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     side: const BorderSide(color: Colors.grey),
                   ),
-                  child: const Text('거절', style: TextStyle(color: Colors.grey)),
+                  child: const Text('취소', style: TextStyle(color: Colors.grey)),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => _handleAccept(context),
+                  // 매칭된 파트너가 없으면 버튼 비활성화
+                  onPressed: _matchedPartners.isEmpty
+                      ? null
+                      : () => _showPartnerSelectionDialog(context),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.pinkAccent, // 메인 테마 색상
+                    backgroundColor: Colors.pinkAccent,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text('수락', style: TextStyle(color: Colors.white)),
+                  child: const Text('함께하기', style: TextStyle(color: Colors.white)),
                 ),
               ),
             ],
@@ -158,50 +164,93 @@ class VolunteerDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String text) {
-    // 텍스트가 비어있으면 보여주지 않음
-    if (text.isEmpty) return const SizedBox.shrink();
+  // [New] 파트너 선택 다이얼로그
+  void _showPartnerSelectionDialog(BuildContext context) {
+    UserProfile? selectedPartner;
 
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('누구와 함께 하시겠습니까?'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      '매칭된 상대방(QnA 수락) 중 한 명을 선택해주세요.',
+                      style: TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    if (_isLoadingPartners)
+                      const Center(child: CircularProgressIndicator())
+                    else if (_matchedPartners.isEmpty)
+                      const Text('매칭된 상대가 없습니다.')
+                    else
+                      Flexible(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _matchedPartners.length,
+                          itemBuilder: (context, index) {
+                            final partner = _matchedPartners[index];
+                            return RadioListTile<UserProfile>(
+                              title: Text(partner.nickname),
+                              subtitle: Text('${partner.age}세 / ${partner.mbti}'),
+                              value: partner,
+                              groupValue: selectedPartner,
+                              activeColor: Colors.pinkAccent,
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedPartner = value;
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('취소'),
+                ),
+                TextButton(
+                  onPressed: selectedPartner == null
+                      ? null
+                      : () {
+                    Navigator.pop(context); // 다이얼로그 닫기
+                    Navigator.pop(context); // 상세 화면 닫기
+                    widget.onAccept(selectedPartner!); // 선택된 파트너 전달
+                  },
+                  child: const Text('신청 완료'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    if (text.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: Colors.pinkAccent), // 아이콘 색상도 테마에 맞게
+          Icon(icon, size: 20, color: Colors.pinkAccent),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF455A64),
-                fontWeight: FontWeight.w500,
-              ),
+              style: const TextStyle(fontSize: 16, color: Color(0xFF455A64), fontWeight: FontWeight.w500),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _handleAccept(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('신청 하시겠습니까?'),
-        content: const Text('상대방에게 수락 의사를 전달합니다.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Dialog 닫기
-              Navigator.pop(context); // Screen 닫기
-              onAccept();
-            },
-            child: const Text('확인'),
           ),
         ],
       ),

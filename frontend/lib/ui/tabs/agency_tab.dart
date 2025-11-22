@@ -45,35 +45,47 @@ class _AgencyTabState extends State<AgencyTab> {
     _loadCsvData(); // CSV 로드 시작
   }
 
-  // CSV 파일 로드 및 파싱 함수
+  // CSV 파일 로드 및 파싱 함수 (수정됨)
   Future<void> _loadCsvData() async {
     try {
-      // 1. CSV 파일 읽기 (경로는 pubspec.yaml에 등록된 경로여야 함)
+      // 1. CSV 파일 읽기
       final rawData = await rootBundle.loadString('assets/volunteers.csv');
 
-      // 2. CSV 파싱
-      List<List<dynamic>> listData = const CsvToListConverter().convert(rawData);
+      // 2. CSV 파싱 (중요: eol 설정을 '\n'으로 강제하여 OS 호환성 확보)
+      List<List<dynamic>> listData =
+      const CsvToListConverter(eol: '\n').convert(rawData);
 
-      // 3. 첫 번째 행(헤더)을 제외하고 모델로 변환
+      // 만약 위 설정으로 파싱이 안돼서 행이 1개 이하라면, 기본 설정으로 재시도 (안전장치)
+      if (listData.length <= 1) {
+        listData = const CsvToListConverter().convert(rawData);
+      }
+
       List<VolunteerActivity> activities = [];
+
+      // 헤더(0번) 제외하고 1번부터 시작
       for (var i = 1; i < listData.length; i++) {
         final row = listData[i];
-        // CSV 컬럼 순서: 활동명(0), 모집기관(1), 봉사분야(2), 봉사기간 및 시간(3), 활동요일(4), 봉사장소(5), 활동내용(6), 요구사항(7)
 
-        // 데이터 유효성 검사 (빈 행 방지)
+        // 데이터 유효성 검사: 컬럼이 8개여야 함
         if (row.length < 8) continue;
 
-        activities.add(VolunteerActivity(
-          id: 'csv_$i', // 고유 ID 생성
-          title: row[0].toString(),
-          agencyName: row[1].toString(),
-          category: row[2].toString(),
-          dateAndTime: row[3].toString(),
-          days: row[4].toString(),
-          location: row[5].toString(),
-          description: row[6].toString(),
-          requirements: row[7].toString().split(',').map((e) => e.trim()).toList(),
-        ));
+        try {
+          activities.add(VolunteerActivity(
+            id: 'csv_$i',
+            title: row[0].toString(),
+            agencyName: row[1].toString(),
+            category: row[2].toString(),
+            dateAndTime: row[3].toString(),
+            days: row[4].toString(),
+            location: row[5].toString(),
+            description: row[6].toString(),
+            // 요구사항: 쉼표로 구분된 문자열을 리스트로 변환
+            requirements:
+            row[7].toString().split(',').map((e) => e.trim()).toList(),
+          ));
+        } catch (e) {
+          debugPrint("Error parsing row $i: $e");
+        }
       }
 
       if (mounted) {
@@ -103,7 +115,7 @@ class _AgencyTabState extends State<AgencyTab> {
       return _allActivities;
     }
     return _allActivities
-        .where((activity) => activity.category.contains(_selectedCategory)) // contains로 유연하게 검색
+        .where((activity) => activity.category.contains(_selectedCategory))
         .toList();
   }
 
@@ -142,7 +154,7 @@ class _AgencyTabState extends State<AgencyTab> {
                 _buildCategoryFilter(), // 여기서 호출 중이므로 아래에 정의가 있어야 함
                 Expanded(
                   child: _isLoading
-                      ? const Center(child: CircularProgressIndicator()) // 로딩 중 표시
+                      ? const Center(child: CircularProgressIndicator())
                       : _filteredActivities.isEmpty
                       ? const Center(child: Text('해당하는 봉사활동이 없습니다.'))
                       : ListView.builder(
@@ -219,10 +231,14 @@ class _AgencyTabState extends State<AgencyTab> {
               builder: (context) => VolunteerDetailScreen(
                 activity: activity,
                 currentUser: widget.currentUser,
-                onAccept: () {
+                api: widget.api, // [추가] API 전달
+                onAccept: (partner) {
+                  // [변경] 선택된 파트너 정보를 받음
                   _handleApplication(activity);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('신청이 완료되었습니다. 내역 탭에서 확인하세요.')),
+                    SnackBar(
+                        content:
+                        Text('${partner.nickname}님에게 봉사 매칭 요청을 보냈습니다!')),
                   );
                 },
               ),
@@ -253,7 +269,8 @@ class _AgencyTabState extends State<AgencyTab> {
               const SizedBox(height: 8),
               Text(
                 activity.title,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style:
+                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               Text(
@@ -264,9 +281,10 @@ class _AgencyTabState extends State<AgencyTab> {
               // 정보 행
               Row(
                 children: [
-                  const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                  const Icon(Icons.calendar_today,
+                      size: 16, color: Colors.grey),
                   const SizedBox(width: 4),
-                  // 날짜만 표시 (CSV 데이터가 길어서 잘라서 표시하거나 그대로 표시)
+                  // 날짜만 표시
                   Expanded(
                     flex: 2,
                     child: Text(
